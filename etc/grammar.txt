@@ -1,0 +1,42 @@
+function -> 'function' <id> '(' optparams ')' '->' <typeid> block
+
+optparams -> params | <empty>
+
+params ->
+      <id> ':' <typeid>
+    | <id> ':' <typeid> ',' params
+
+block -> '{' optexprs '}'
+
+optexprs -> exprs | <empty>
+
+exprs ->
+      expr
+    | expr ';' exprs
+
+expr ->
+      def
+    | assign
+    | op
+
+def -> 'let' <id> ':' <typeid> '=' expr
+
+assign -> <id> '=' expr
+
+op -> term op_rest
+
+op_rest ->
+      '+' term
+    | '-' term
+    | <empty>
+
+term -> factor term_rest
+
+term_rest ->
+      '*' factor
+    | '/' factor
+    | <empty>
+
+factor ->
+      <id>
+    | <number>
