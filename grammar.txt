@@ -1,0 +1,78 @@
+function -> 'function' <id> '(' optparams ')' ':' <id> block
+
+optparams -> params | <empty>
+
+params ->
+      <id> ':' <id>
+    | <id> ':' <id> ',' params
+
+block ->
+      '{' optexprs '}'
+    | expr
+
+optexprs -> exprs | <empty>
+
+exprs ->
+      expr
+    | expr ';' exprs
+
+expr ->
+      def
+    | assign
+    | op
+    | if
+    | while
+    | fcall
+
+def ->
+      'let' <id> ':' <id> '=' expr
+    | 'let' <id> '=' expr
+
+assign -> <id> '=' expr
+
+if ->
+      'if' '(' expr ')' block
+    | 'if' '(' expr ')' block 'else' block
+    
+while -> 'while' '(' expr ')' block
+
+fcall -> <id> '(' optargs ')'
+
+optargs -> args | <empty>
+
+args ->
+      expr
+    | expr ',' args
+
+op -> addsub op_rest
+
+op_rest ->
+      '<' addsub
+    | '>' addsub
+    | '==' addsub
+    | '!=' addsub
+    | '<=' addsub
+    | '>=' addsub
+    | <empty>
+
+addsub -> muldiv addsub_rest
+
+addsub_rest ->
+      '+' muldiv
+    | '-' muldiv
+    | <empty>
+
+muldiv -> factor muldiv_rest
+
+muldiv_rest ->
+      '*' factor
+    | '/' factor
+    | <empty>
+
+factor ->
+      <id>
+    | <number>
+    | true
+    | false
+    | '(' expr ')'
+    | '!' '(' expr ')'
