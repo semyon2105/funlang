@@ -36,15 +36,10 @@ def -> 'let' <id> def_rest
 
 def_rest ->
       ':' <id> '=' expr
-    | '=' expr
 
 assign -> <id> '=' expr
 
-if -> 'if' '(' expr ')' block optelse
-
-optelse ->
-      'else' block
-    | <empty>
+if -> 'if' '(' expr ')' block
     
 while -> 'while' '(' expr ')' block
 
@@ -88,6 +83,7 @@ factor ->
     | <number>
     | true
     | false
+    | null
     | '-' expr
-    | '!' expr
+    | '!' '(' expr ')'
     | '(' expr ')'

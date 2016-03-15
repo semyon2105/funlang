@@ -1,8 +1,8 @@
 #ifndef FUNLANG_LEX_H
 #define FUNLANG_LEX_H
 
-#include <memory>
 #include <iostream>
+#include <memory>
 #include <string>
 #include <unordered_map>
 
@@ -67,6 +67,16 @@ public:
         return std::make_unique<Error>(
                 "Unexpected '" + std::string{ch}  + "'",
                 ch, lineno, colno);
+    }
+
+    std::vector<std::unique_ptr<Token>> get_tokens()
+    {
+        std::vector<std::unique_ptr<Token>> tokens;
+        std::unique_ptr<Token> token;
+        while (token = get_token()) {
+            tokens.push_back(std::move(token));
+        }
+        return tokens;
     }
 
     size_t column() const { return colno; }
@@ -140,7 +150,6 @@ private:
                 if (ws_stripped) {
                     break;
                 }
-
                 token_str += consume();
             }
         }

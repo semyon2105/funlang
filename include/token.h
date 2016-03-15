@@ -40,8 +40,8 @@ public:
             char ch = static_cast<char>(kind);
             if (Token::valid_chars.find(ch) != std::string::npos)
                 return std::string{"'" + std::string{ch} + "'"};
-            else
-                return std::string{"'" + std::string{ch} + "'"};
+
+            return std::string{"INVALID'" + std::string{ch} + "'"};
         }
         switch (kind)
         {
@@ -59,7 +59,7 @@ public:
             case Token::LE:         return "\'<=\'";
             case Token::LET:        return "LET";
             case Token::NEQ:        return "\'!=\'";
-            case Token::NULLVAL:    return "NULL";
+            case Token::NULLVAL:    return "NULLVAL";
             case Token::TRUE:       return "TRUE";
             case Token::WHILE:      return "WHILE";
             default:
