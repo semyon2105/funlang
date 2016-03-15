@@ -7,9 +7,7 @@
 
 int main(int argc, char* argv[])
 {
-    if (argc != 2) return 1;
-
-    std::ifstream ifs {argv[1]};
+    std::ifstream ifs {"/home/semyon/Projects/funlang/example.f"};
     ifs.sync_with_stdio(false);
 
     Funlang::Lexer lexer{ifs};

@@ -1,3 +1,6 @@
+#ifndef FUNLANG_TOKEN_H
+#define FUNLANG_TOKEN_H
+
 #include <iostream>
 #include <string>
 
@@ -22,6 +25,7 @@ public:
         LE,
         LET,
         NEQ,
+        NULLVAL,
         TRUE,
         WHILE,
         ERROR
@@ -29,21 +33,22 @@ public:
 
     static const std::string valid_chars;
 
-    static std::string kind_str(Kind kind)
+    static std::string kind_to_string(Kind kind)
     {
         if (kind < 256)
         {
             char ch = static_cast<char>(kind);
             if (Token::valid_chars.find(ch) != std::string::npos)
-                return std::string{"VALIDCH'" + std::string{ch} + "'"};
+                return std::string{"'" + std::string{ch} + "'"};
             else
-                return std::string{"INVALCH'" + std::string{ch} + "'"};
+                return std::string{"'" + std::string{ch} + "'"};
         }
         switch (kind)
         {
             case Token::BOOL:       return "BOOL";
             case Token::ELSE:       return "ELSE";
             case Token::EQ:         return "\'==\'";
+            case Token::ERROR:      return "ERROR";
             case Token::FALSE:      return "FALSE";
             case Token::FLOAT:      return "FLOAT";
             case Token::FUNCTION:   return "FUNCTION";
@@ -54,9 +59,9 @@ public:
             case Token::LE:         return "\'<=\'";
             case Token::LET:        return "LET";
             case Token::NEQ:        return "\'!=\'";
+            case Token::NULLVAL:    return "NULL";
             case Token::TRUE:       return "TRUE";
             case Token::WHILE:      return "WHILE";
-            case Token::ERROR:      return "ERROR";
             default:
                 return "UNKNOWN'"
                        + std::to_string(static_cast<size_t>(kind))
@@ -64,9 +69,9 @@ public:
         }
     }
 
-    static std::string kind_str(char ch)
+    static std::string kind_to_string(char ch)
     {
-        return kind_str(static_cast<Kind>(ch));
+        return kind_to_string(static_cast<Kind>(ch));
     }
 
     const Kind kind;
@@ -79,7 +84,7 @@ public:
 
     virtual std::string to_string() const
     {
-        return "<" + kind_str(kind) + ">";
+        return "<" + kind_to_string(kind) + ">";
     }
 };
 
@@ -93,7 +98,7 @@ public:
 
     std::string to_string() const override
     {
-        return "<" + kind_str(kind) + ", " + name + ">";
+        return "<" + kind_to_string(kind) + ", " + name + ">";
     }
 };
 
@@ -107,7 +112,7 @@ public:
 
     std::string to_string() const override
     {
-        return "<" + kind_str(kind) + ", "
+        return "<" + kind_to_string(kind) + ", "
                + (value ? "true" : "false") + ">";
     }
 };
@@ -122,7 +127,7 @@ public:
     
     std::string to_string() const override
     {
-        return "<" + kind_str(kind) + ", "
+        return "<" + kind_to_string(kind) + ", "
                + std::to_string(value) + ">";
     }
 };
@@ -137,10 +142,12 @@ public:
 
     std::string to_string() const override
     {
-        return "<" + kind_str(kind) + ", "
+        return "<" + kind_to_string(kind) + ", "
                + std::to_string(value) + ">";
     }
 };
+
+
 
 class Error : public Token
 {
@@ -161,8 +168,8 @@ public:
 
     std::string to_string() const override
     {
-        return "<" + kind_str(kind)
-        + "{" + errmsg + "}, " + kind_str(badchar)
+        return "<" + kind_to_string(kind)
+        + "{" + errmsg + "}, " + kind_to_string(badchar)
         + ", line: " + std::to_string(lineno)
         + ", col: " + std::to_string(colno) + ">";
     }
@@ -176,3 +183,5 @@ std::ostream& operator<<(std::ostream& os, const Token& t)
 }
 
 }
+
+#endif //FUNLANG_TOKEN_H

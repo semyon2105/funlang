@@ -1,3 +1,6 @@
+#ifndef FUNLANG_LEX_H
+#define FUNLANG_LEX_H
+
 #include <memory>
 #include <iostream>
 #include <string>
@@ -7,11 +10,6 @@
 
 namespace Funlang
 {
-
-struct Stream_failure
-{
-    std::istream& is;
-};
 
 class Lexer
 {
@@ -87,12 +85,12 @@ private:
 
     std::unordered_map<std::string, Token> keywords =
     {
-            { "bool", Token{Token::BOOL} },
             { "else", Token{Token::ELSE} },
             { "false", Token{Token::FALSE} },
             { "function", Token{Token::FUNCTION} },
             { "if", Token{Token::IF} },
             { "let", Token{Token::LET} },
+            { "null", Token{Token::NULLVAL} },
             { "true", Token{Token::TRUE} },
             { "while", Token{Token::WHILE} }
     };
@@ -101,17 +99,13 @@ private:
     {
         std::string token_str;
         bool float_num = false;
-        while (isdigit(look_ahead()) || look_ahead() == '.')
-        {
+        while (std::isdigit(look_ahead()) || look_ahead() == '.') {
             char peek = consume();
-            if (peek == '.')
-            {
-                if (!float_num)
-                {
+            if (peek == '.') {
+                if (!float_num) {
                     float_num = true;
                 }
-                else
-                {
+                else {
                     return std::make_unique<Error>(
                             "Multiple dots in number " + token_str + peek,
                             peek, lineno, colno);
@@ -119,20 +113,16 @@ private:
             }
             token_str += peek;
         }
-        if (!token_str.empty())
-        {
-            if (token_str == ".")
-            {
+        if (!token_str.empty()) {
+            if (token_str == ".") {
                 return std::make_unique<Error>(
                         "Number expected", '.', lineno, colno);
             }
-            if (!float_num)
-            {
+            if (!float_num) {
                 int value = std::stoi(token_str);
                 return std::make_unique<Int>(value);
             }
-            else
-            {
+            else {
                 float value = std::stof(token_str);
                 return std::make_unique<Float>(value);
             }
@@ -143,18 +133,21 @@ private:
     std::unique_ptr<Token> get_id_or_keyword()
     {
         std::string token_str;
-        if (isalpha(look_ahead()))
-        {
+        if (std::isalpha(look_ahead())) {
             token_str += consume();
-            while (isalnum(look_ahead()))
-            {
-                token_str += consume();
-                auto keyword = keywords.find(token_str);
-                if (keyword != std::end(keywords))
-                {
-                    return std::make_unique<Token>(keyword->second);
+            while (std::isalnum(look_ahead())) {
+                // stop forming the name if whitespace was stripped
+                if (ws_stripped) {
+                    break;
                 }
+
+                token_str += consume();
             }
+        }
+        auto keyword = keywords.find(token_str);
+        if (keyword != std::end(keywords))
+        {
+            return std::make_unique<Token>(keyword->second);
         }
         if (!token_str.empty())
         {
@@ -166,22 +159,22 @@ private:
     void strip_ws()
     {
         if (ws_stripped) return;
+        if (!std::isspace(is.peek())) {
+            return;
+        }
 
         new_colno = colno;
-        while (isspace(is.peek()))
-        {
+        do {
             char c = is.get();
-            if (c != '\n')
-            {
+            if (c != '\n') {
                 if (c != '\t') ++new_colno;
                 else new_colno += 4;
             }
-            else
-            {
+            else {
                 ++line_offset;
                 new_colno = 0;
             }
-        }
+        } while (std::isspace(is.peek()));
 
         ws_stripped = true;
     }
@@ -197,19 +190,20 @@ private:
     {
         strip_ws();
         if (is.eof()) return '\0';
-        if (!is) throw Stream_failure{is};
         return is.peek();
     }
 
     char consume()
     {
         char c = look_ahead();
+        update_position();
         is.ignore();
         ++colno;
-        update_position();
         ws_stripped = false;
         return c;
     }
 };
 
 }
+
+#endif //FUNLANG_LEX_H

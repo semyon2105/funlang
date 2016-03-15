@@ -2,9 +2,11 @@ function -> 'function' <id> '(' optparams ')' ':' <id> block
 
 optparams -> params | <empty>
 
-params ->
-      <id> ':' <id>
-    | <id> ':' <id> ',' params
+params -> <id> ':' <id> params_rest
+
+params_rest ->
+      ',' params
+    | <empty>
 
 block ->
       '{' optexprs '}'
@@ -24,15 +26,19 @@ expr ->
     | while
     | fcall
 
-def ->
-      'let' <id> ':' <id> '=' expr
-    | 'let' <id> '=' expr
+def -> 'let' <id> def_rest
+
+def_rest ->
+      ':' <id> '=' expr
+    | '=' expr
 
 assign -> <id> '=' expr
 
-if ->
-      'if' '(' expr ')' block
-    | 'if' '(' expr ')' block 'else' block
+if -> 'if' '(' expr ')' block optelse
+
+optelse ->
+      'else' block
+    | <empty>
     
 while -> 'while' '(' expr ')' block
 
@@ -40,9 +46,11 @@ fcall -> <id> '(' optargs ')'
 
 optargs -> args | <empty>
 
-args ->
-      expr
-    | expr ',' args
+args -> expr args_rest
+
+args_rest ->
+      ',' args
+    | <empty>
 
 op -> addsub op_rest
 
@@ -74,5 +82,6 @@ factor ->
     | <number>
     | true
     | false
+    | '-' expr
+    | '!' expr
     | '(' expr ')'
-    | '!' '(' expr ')'
