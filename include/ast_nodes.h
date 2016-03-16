@@ -30,24 +30,20 @@ protected:
 class Program : public Node
 {
 public:
-    Program();
-    Program(std::vector<std::unique_ptr<Function>> functions,
-            std::unique_ptr<Function> entrypoint);
+    Program(std::vector<std::unique_ptr<Function>> functions);
 
     const std::vector<std::unique_ptr<Function>>& functions() const;
-    std::unique_ptr<Function> entrypoint() const;
 
 private:
     std::vector<std::unique_ptr<Function>> functions_;
-    std::unique_ptr<Function> entrypoint_;
 };
 
 struct Parameter
 {
-    Parameter(const std::string& name, Expression::Type type);
+    Parameter(const std::string& name, const std::string& type_name);
 
     const std::string name;
-    const Expression::Type type;
+    const std::string type_name;
 };
 
 class Function : public Node
@@ -55,7 +51,7 @@ class Function : public Node
 public:
     Function(const std::string& name,
              std::vector<Parameter> params,
-             Expression::Type return_type,
+             const std::string& return_type,
              std::unique_ptr<Block> body);
 
     std::string name() const;
@@ -66,14 +62,13 @@ public:
 private:
     const std::string name_;
     const std::vector<Parameter> params;
-    const Expression::Type return_type;
+    const std::string return_type;
     std::unique_ptr<Block> body_;
 };
 
 class Block : public Node
 {
 public:
-    Block();
     Block(std::vector<std::unique_ptr<Expression>> exprs);
 
     const std::vector<std::unique_ptr<Expression>>& expressions() const;

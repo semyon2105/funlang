@@ -7,8 +7,8 @@ Node::~Node()
 
 }
 
-Program::Program()
-    : functions_{std::vector<Function*>{}}, entrypoint_{nullptr}
+Program::Program(std::vector<std::unique_ptr<Function>> functions)
+    : functions_{functions}
 {
 
 }
