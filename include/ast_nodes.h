@@ -6,25 +6,51 @@
 #include <unordered_map>
 #include <vector>
 
+#include "token.h"
+
 namespace Funlang
 {
 
 namespace AST
 {
 
+static const std::string PLACEHOLDER_TYPE = "PLACEHOLDER_TYPE";
+
+class Program;
+struct Parameter;
+class Function;
+class Block;
+class Expression;
+
 struct Visitor
 {
+    virtual void accept(Program&) = 0;
+    virtual void accept(Function&) = 0;
+    virtual void accept(Block&) = 0;
+    virtual void accept(Expression&) = 0;
+};
 
+struct PrinterVisitor : Visitor
+{
+    static size_t level;
+
+    struct LevelGuard
+    {
+        LevelGuard() { ++level; }
+        ~LevelGuard() { --level; }
+    };
+
+    static void print(const std::string& s);
+
+    void accept(Program&) override;
+    void accept(Function&) override;
+    void accept(Block&) override;
+    void accept(Expression&) override;
 };
 
 struct Node
 {
-    // virtual void accept(Visitor& v) const = 0;
-
-    virtual ~Node();
-
-protected:
-    Node();
+    virtual void accept(Visitor&) = 0;
 };
 
 class Program : public Node
@@ -34,13 +60,15 @@ public:
 
     const std::vector<std::unique_ptr<Function>>& functions() const;
 
+    void accept(Visitor&) override;
+
 private:
-    std::vector<std::unique_ptr<Function>> functions_;
+    const std::vector<std::unique_ptr<Function>> functions_;
 };
 
 struct Parameter
 {
-    Parameter(const std::string& name, const std::string& type_name);
+    Parameter(std::string name, std::string type_name);
 
     const std::string name;
     const std::string type_name;
@@ -49,21 +77,23 @@ struct Parameter
 class Function : public Node
 {
 public:
-    Function(const std::string& name,
+    Function(std::string name,
              std::vector<Parameter> params,
-             const std::string& return_type,
+             std::string return_type,
              std::unique_ptr<Block> body);
 
-    std::string name() const;
+    const std::string& name() const;
     const std::vector<Parameter>& parameters() const;
-    const Expression::Type type() const;
+    const std::string& return_type() const;
     Block* body() const;
+
+    void accept(Visitor&) override;
 
 private:
     const std::string name_;
-    const std::vector<Parameter> params;
-    const std::string return_type;
-    std::unique_ptr<Block> body_;
+    const std::vector<Parameter> params_;
+    const std::string return_type_;
+    const std::unique_ptr<Block> body_;
 };
 
 class Block : public Node
@@ -72,64 +102,55 @@ public:
     Block(std::vector<std::unique_ptr<Expression>> exprs);
 
     const std::vector<std::unique_ptr<Expression>>& expressions() const;
-    auto& symbol_table() -> std::unordered_map<std::string, Variable*>;
+
+    void accept(Visitor&) override;
 
 private:
-    std::unordered_map<std::string, Variable*> sym_table;
-    std::vector<std::unique_ptr<Expression>> exprs;
+    const std::vector<std::unique_ptr<Expression>> exprs;
 };
 
-class Expression : public Node
+struct Expression : public Node
 {
-public:
-    Expression();
+    virtual const std::string& type() const;// = 0;
 
-    enum class Type
-    {
-        Bool,
-        Error,
-        Int,
-        Float,
-        Null
-    };
-
-    virtual auto& symbol_table() -> std::unordered_map<std::string, Variable*>;
-    virtual const Type& type() const;
-
-    virtual ~Expression();
-
-private:
-    std::unordered_map<std::string, Variable*> sym_table;
+    void accept(Visitor&) override;
 };
 
 class Definition : public Expression
 {
 public:
-    Definition(std::unique_ptr<Variable> var, std::unique_ptr<Expression> expr);
+    Definition(std::string var_name, std::string var_type, std::unique_ptr<Expression> expr);
 
-    const Type& type() const override;
+    const std::string& type() const override { return PLACEHOLDER_TYPE; };
 
-    Variable* variable() const;
+    const std::string& var_name() const;
+    const std::string& var_type() const;
+
     Expression* expression() const;
 
+    // void accept(Visitor&) override;
+
 private:
-    std::unique_ptr<Variable> var;
-    std::unique_ptr<Expression> expr;
+    const std::string var_name_;
+    const std::string var_type_;
+    const std::unique_ptr<Expression> expr;
 };
 
 class Assignment : public Expression
 {
 public:
-    Assignment(std::unique_ptr<Variable> var, std::unique_ptr<Expression> expr);
+    Assignment(std::string variable_name, std::unique_ptr<Expression> expression);
 
-    const Type& type() const override;
+    const std::string& type() const override { return PLACEHOLDER_TYPE; };
 
-    Variable* variable() const;
+    const std::string& variable_name() const;
     Expression* expression() const;
 
+    // void accept(Visitor&) override;
+
 private:
-    std::unique_ptr<Variable> var;
-    std::unique_ptr<Expression> expr;
+    const std::string var_name;
+    const std::unique_ptr<Expression> expr;
 };
 
 class BinaryOperation : public Expression
@@ -150,18 +171,24 @@ public:
         GrEq
     };
 
-    BinaryOperation(Kind kind, std::unique_ptr<Expression> lhs_expr, std::unique_ptr<Expression> rhs_expr);
+    static Kind from_token_kind(const Token&);
 
-    const Type& type() const override;
+    BinaryOperation(std::unique_ptr<Expression> lhs_expr,
+                    Kind kind,
+                    std::unique_ptr<Expression> rhs_expr);
 
-    const Kind& kind() const;
+    const std::string& type() const override { return PLACEHOLDER_TYPE; };
+
     Expression* lhs() const;
+    Kind kind() const;
     Expression* rhs() const;
 
+    // void accept(Visitor&) override;
+
 private:
-    Kind kind_;
-    std::unique_ptr<Expression> lhs_expr;
-    std::unique_ptr<Expression> rhs_expr;
+    const Kind kind_;
+    const std::unique_ptr<Expression> lhs_expr;
+    const std::unique_ptr<Expression> rhs_expr;
 };
 
 class UnaryOperation : public Expression
@@ -173,19 +200,18 @@ public:
         Minus
     };
 
-    UnaryOperation(Kind kind, std::unique_ptr<Expression> expr)
-    {
+    UnaryOperation(Kind kind, std::unique_ptr<Expression> expr);
 
-    }
+    const std::string& type() const override { return PLACEHOLDER_TYPE; };
 
-    const Type& type() const override;
-
-    const Kind& kind() const;
+    Kind kind() const;
     Expression* expression() const;
 
+    // void accept(Visitor&) override;
+
 private:
-    Kind kind_;
-    std::unique_ptr<Expression> expr_;
+    const Kind kind_;
+    const std::unique_ptr<Expression> expr;
 };
 
 class IfExpr : public Expression
@@ -193,14 +219,16 @@ class IfExpr : public Expression
 public:
     IfExpr(std::unique_ptr<Expression> condition, std::unique_ptr<Block> body);
 
-    const Type& type() const override;
+    const std::string& type() const override { return PLACEHOLDER_TYPE; };
 
     Expression* condition() const;
     Block* body() const;
 
+    // void accept(Visitor&) override;
+
 private:
-    std::unique_ptr<Expression> cond;
-    std::unique_ptr<Block> body_;
+    const std::unique_ptr<Expression> cond;
+    const std::unique_ptr<Block> body_;
 };
 
 class WhileExpr : public Expression
@@ -208,25 +236,30 @@ class WhileExpr : public Expression
 public:
     WhileExpr(std::unique_ptr<Expression> condition, std::unique_ptr<Block> body);
 
-    const Type& type() const override;
+    const std::string& type() const override { return PLACEHOLDER_TYPE; };
 
     Expression* condition() const;
     Block* body() const;
 
+    // void accept(Visitor&) override;
+
 private:
-    std::unique_ptr<Expression> cond;
-    std::unique_ptr<Block> body_;
+    const std::unique_ptr<Expression> cond;
+    const std::unique_ptr<Block> body_;
 };
 
 class FunctionCall : public Expression
 {
 public:
-    FunctionCall(const std::string& func_name, std::vector<std::unique_ptr<Expression>>&& args);
+    FunctionCall(std::string func_name,
+                 std::vector<std::unique_ptr<Expression>> args);
 
-    const Type& type() const override;
+    const std::string& type() const override { return PLACEHOLDER_TYPE; };
 
-    std::string function_name() const;
-    const std::vector<std::unique_ptr<Expression>>& arguments();
+    const std::string& function_name() const;
+    const std::vector<std::unique_ptr<Expression>>& arguments() const;
+
+    // void accept(Visitor&) override;
 
 private:
     const std::string& func_name;
@@ -237,11 +270,12 @@ private:
 class Variable : public Expression
 {
 public:
-    Variable(const std::string& name);
+    Variable(std::string name);
 
-    const Type& type() const override;
+    const std::string& type() const override { return PLACEHOLDER_TYPE; };
+    const std::string& name() const;
 
-    std::string name() const;
+    // void accept(Visitor&) override;
 
 private:
     const std::string name_;
@@ -249,41 +283,44 @@ private:
 
 struct BoolValue : public Expression
 {
-public:
     BoolValue(bool value);
 
-    const Type& type() const override;
+    const std::string& type() const override;
 
-    bool value() const;
+    const bool value;
 
-private:
-    const bool value_;
+    // void accept(Visitor&) override;
 };
 
 struct IntValue : public Expression
 {
-public:
     IntValue(int value);
 
-    const Type& type() const override;
+    const std::string& type() const override;
 
-    int value() const;
+    const int value;
 
-private:
-    const int value_;
+    // void accept(Visitor&) override;
 };
 
 struct FloatValue : public Expression
 {
-public:
     FloatValue(double value);
 
-    const Type& type() const override;
+    const std::string& type() const override;
 
-    double value() const;
+    const double value;
 
-private:
-    const double value_;
+    // void accept(Visitor&) override;
+};
+
+struct NullValue : public Expression
+{
+    NullValue();
+
+    const std::string& type() const override;
+
+    // void accept(Visitor&) override;
 };
 
 }

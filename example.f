@@ -2,16 +2,16 @@ function main() : int
 {
     let v : float = 2 + 2.5 * 6;
     v = v - 1;
-    let result = other(10, v);
+    let result : float = other(10, v);
     print(result)
 }
 
 function other(a:int, b:float) : float
 {
-    let n1 = if (a > b) a else b;
-    let n2 = while (b >= a) a = a + 1;
-    let n3 : bool = if (a != b) a;
-    let n4 = true;
-    let n5 = false;
+    let n1 : float = if (a > b) a;
+    let n2 : int = while (b >= a) { a = a + 1 };
+    let n3 : void = if (a != b) { };
+    let n4 : bool = true;
+    let n5 : bool = false;
     let xD : float = 1.2345
 }

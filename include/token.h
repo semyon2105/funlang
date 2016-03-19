@@ -12,8 +12,7 @@ class Token
 public:
     enum Kind
     {
-        BOOL = 256,
-        ELSE,
+        ELSE = 256,
         EQ,
         FALSE,
         FLOAT,
@@ -38,14 +37,13 @@ public:
         if (kind < 256)
         {
             char ch = static_cast<char>(kind);
-            if (Token::valid_chars.find(ch) != std::string::npos)
+            if (valid_chars.find(ch) != std::string::npos)
                 return std::string{"'" + std::string{ch} + "'"};
 
             return std::string{"INVALID'" + std::string{ch} + "'"};
         }
         switch (kind)
         {
-            case Token::BOOL:       return "BOOL";
             case Token::ELSE:       return "ELSE";
             case Token::EQ:         return "\'==\'";
             case Token::ERROR:      return "ERROR";
@@ -99,21 +97,6 @@ public:
     std::string to_string() const override
     {
         return "<" + kind_to_string(kind) + ", " + name + ">";
-    }
-};
-
-class Bool : public Token
-{
-public:
-    const bool value;
-
-    Bool(bool value)
-        : Token{BOOL}, value{value} {}
-
-    std::string to_string() const override
-    {
-        return "<" + kind_to_string(kind) + ", "
-               + (value ? "true" : "false") + ">";
     }
 };
 
@@ -175,12 +158,7 @@ public:
     }
 };
 
-const std::string Token::valid_chars = ",:;(){}!=+-*/<>";
-
-std::ostream& operator<<(std::ostream& os, const Token& t)
-{
-    return os << t.to_string();
-}
+std::ostream& operator<<(std::ostream& os, const Token& t);
 
 }
 

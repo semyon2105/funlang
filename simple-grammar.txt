@@ -15,27 +15,26 @@ params_rest ->
     | <empty>
 
 block ->
-      '{' optexprs '}'
-    | expr
+      expr
+    | '{' optexprs '}'
 
 optexprs -> exprs | <empty>
 
-exprs ->
-      expr
-    | expr ';' exprs
+exprs -> expr exprs_rest
+
+exprs_rest ->
+      ';' exprs
+    | <empty>
 
 expr ->
       def
     | assign
-    | op
     | if
     | while
     | fcall
+    | op
 
-def -> 'let' <id> def_rest
-
-def_rest ->
-      ':' <id> '=' expr
+def -> 'let' <id> ':' <id> '=' expr
 
 assign -> <id> '=' expr
 
@@ -53,9 +52,9 @@ args_rest ->
       ',' args
     | <empty>
 
-op -> addsub op_rest
+op -> addsub cond_rest
 
-op_rest ->
+cond_rest ->
       '<' addsub
     | '>' addsub
     | '==' addsub
@@ -80,7 +79,8 @@ muldiv_rest ->
 
 factor ->
       <id>
-    | <number>
+    | <integer>
+    | <float_number>
     | true
     | false
     | null

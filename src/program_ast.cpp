@@ -7,3 +7,8 @@ ProgramAST::ProgramAST(std::unique_ptr<Program> root)
 {
 }
 
+Program* ProgramAST::root() const
+{
+    return root_.get();
+}
+

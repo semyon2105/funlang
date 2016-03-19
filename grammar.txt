@@ -15,22 +15,24 @@ params_rest ->
     | <empty>
 
 block ->
-      '{' optexprs '}'
-    | expr
+      expr
+    | '{' optexprs '}'
 
 optexprs -> exprs | <empty>
 
-exprs ->
-      expr
-    | expr ';' exprs
+exprs -> expr exprs_rest
+
+exprs_rest ->
+      ';' exprs
+    | <empty>
 
 expr ->
       def
     | assign
-    | op
     | if
     | while
     | fcall
+    | op
 
 def -> 'let' <id> def_rest
 
@@ -38,6 +40,7 @@ def_rest ->
       ':' <id> '=' expr
     | '=' expr
 
+// FIRST(fcall) == FIRST(assign) == FIRST(op)
 assign -> <id> '=' expr
 
 if -> 'if' '(' expr ')' block optelse
@@ -48,6 +51,7 @@ optelse ->
     
 while -> 'while' '(' expr ')' block
 
+// FIRST(fcall) == FIRST(assign) == FIRST(op)
 fcall -> <id> '(' optargs ')'
 
 optargs -> args | <empty>
@@ -58,9 +62,10 @@ args_rest ->
       ',' args
     | <empty>
 
-op -> addsub op_rest
+// FIRST(fcall) == FIRST(assign) == FIRST(op)
+op -> addsub cond_rest
 
-op_rest ->
+cond_rest ->
       '<' addsub
     | '>' addsub
     | '==' addsub
@@ -83,9 +88,11 @@ muldiv_rest ->
     | '/' factor
     | <empty>
 
+// FIRST(fcall) == FIRST(assign) == FIRST(op)
 factor ->
       <id>
-    | <number>
+    | <integer>
+    | <float_number>
     | true
     | false
     | '-' expr

@@ -73,7 +73,7 @@ public:
     {
         std::vector<std::unique_ptr<Token>> tokens;
         std::unique_ptr<Token> token;
-        while (token = get_token()) {
+        while ((token = get_token())) {
             tokens.push_back(std::move(token));
         }
         return tokens;
