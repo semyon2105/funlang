@@ -64,9 +64,9 @@ public:
             return std::make_unique<Token>(ch);
         }
 
-        return std::make_unique<Error>(
+        return std::make_unique<ErrorToken>(
                 "Unexpected '" + std::string{ch}  + "'",
-                ch, lineno, colno);
+                ch, lineno);
     }
 
     std::vector<std::unique_ptr<Token>> get_tokens()
@@ -79,16 +79,13 @@ public:
         return tokens;
     }
 
-    size_t column() const { return colno; }
     size_t line() const { return lineno; }
 
 private:
     std::istream& is;
 
-    size_t colno = 0;
     size_t lineno = 1;
 
-    size_t new_colno = 0;
     size_t line_offset = 0;
 
     bool ws_stripped = false;
@@ -116,17 +113,17 @@ private:
                     float_num = true;
                 }
                 else {
-                    return std::make_unique<Error>(
+                    return std::make_unique<ErrorToken>(
                             "Multiple dots in number " + token_str + peek,
-                            peek, lineno, colno);
+                            peek, lineno);
                 }
             }
             token_str += peek;
         }
         if (!token_str.empty()) {
             if (token_str == ".") {
-                return std::make_unique<Error>(
-                        "Number expected", '.', lineno, colno);
+                return std::make_unique<ErrorToken>(
+                        "Number expected", '.', lineno);
             }
             if (!float_num) {
                 int value = std::stoi(token_str);
@@ -172,16 +169,10 @@ private:
             return;
         }
 
-        new_colno = colno;
         do {
             char c = is.get();
-            if (c != '\n') {
-                if (c != '\t') ++new_colno;
-                else new_colno += 4;
-            }
-            else {
+            if (c == '\n') {
                 ++line_offset;
-                new_colno = 0;
             }
         } while (std::isspace(is.peek()));
 
@@ -190,7 +181,6 @@ private:
 
     void update_position()
     {
-        colno = new_colno;
         lineno += line_offset;
         line_offset = 0;
     }
@@ -207,7 +197,6 @@ private:
         char c = look_ahead();
         update_position();
         is.ignore();
-        ++colno;
         ws_stripped = false;
         return c;
     }

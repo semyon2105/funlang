@@ -132,20 +132,18 @@ public:
 
 
 
-class Error : public Token
+class ErrorToken : public Token
 {
 public:
     const std::string errmsg;
     const char badchar;
     const size_t lineno;
-    const size_t colno;
 
-    Error(const std::string& errmsg, char badchar, size_t lineno, size_t colno)
+    ErrorToken(const std::string& errmsg, char badchar, size_t lineno)
         : Token{ERROR},
           errmsg{errmsg},
           badchar{badchar},
-          lineno{lineno},
-          colno{colno}
+          lineno{lineno}
     {
     }
 
@@ -153,8 +151,7 @@ public:
     {
         return "<" + kind_to_string(kind)
         + "{" + errmsg + "}, " + kind_to_string(badchar)
-        + ", line: " + std::to_string(lineno)
-        + ", col: " + std::to_string(colno) + ">";
+        + ", line: " + std::to_string(lineno) + ">";
     }
 };
 

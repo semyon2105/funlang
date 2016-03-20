@@ -15,13 +15,8 @@ const std::vector<std::unique_ptr<Function>>& Program::functions() const
     return functions_;
 }
 
-Parameter::Parameter(std::string name, std::string type_name)
-    : name{std::move(name)}, type_name{std::move(type_name)}
-{
-}
-
 Function::Function(std::string name,
-                   std::vector<Parameter> params,
+                   std::vector<std::unique_ptr<Parameter>> params,
                    std::string return_type,
                    std::unique_ptr<Block> body)
     : name_{std::move(name)},
@@ -36,7 +31,7 @@ const std::string& Function::name() const
     return name_;
 }
 
-const std::vector<Parameter>& Function::parameters() const
+const std::vector<std::unique_ptr<Parameter>>& Function::parameters() const
 {
     return params_;
 }
@@ -49,6 +44,21 @@ const std::string& Function::return_type() const
 Block* Function::body() const
 {
     return body_.get();
+}
+
+Parameter::Parameter(std::string name, std::string type_name)
+        : name_{std::move(name)}, type_name_{std::move(type_name)}
+{
+}
+
+const std::string& Parameter::name() const
+{
+    return name_;
+}
+
+const std::string& Parameter::type_name() const
+{
+    return type_name_;
 }
 
 Block::Block(std::vector<std::unique_ptr<Expression>> exprs)
@@ -106,46 +116,25 @@ Expression* Assignment::expression() const
 }
 
 BinaryOperation::BinaryOperation(
-        std::unique_ptr<Expression> lhs_expr,
-        Kind kind,
-        std::unique_ptr<Expression> rhs_expr)
-    : lhs_expr{std::move(lhs_expr)}, kind_{kind}, rhs_expr{std::move(rhs_expr)}
+        std::unique_ptr<Expression> lhs,
+        std::unique_ptr<BinaryOperationRest> rest)
+    : lhs_{std::move(lhs)}, rest_{std::move(rest)}
 {
 }
 
 Expression* BinaryOperation::lhs() const
 {
-    return lhs_expr.get();
+    return lhs_.get();
 }
 
-BinaryOperation::Kind BinaryOperation::kind() const
+BinaryOperationRest* BinaryOperation::rest() const
 {
-    return kind_;
+    return rest_.get();
 }
 
-UnaryOperation::UnaryOperation(Kind kind, std::unique_ptr<Expression> expr)
-    : kind_{kind}, expr{std::move(expr)}
+BinaryOperation::Kind BinaryOperation::from_token_kind(const Token::Kind& kind)
 {
-}
-
-UnaryOperation::Kind UnaryOperation::kind() const
-{
-    return kind_;
-}
-
-Expression* UnaryOperation::expression() const
-{
-    return expr.get();
-}
-
-Expression* BinaryOperation::rhs() const
-{
-    return rhs_expr.get();
-}
-
-BinaryOperation::Kind BinaryOperation::from_token_kind(const Token& t)
-{
-    switch (t.kind) {
+    switch (kind) {
         case (Token::Kind)'+': return Kind::Add;
         case (Token::Kind)'-': return Kind::Sub;
         case (Token::Kind)'*': return Kind::Mul;
@@ -160,6 +149,65 @@ BinaryOperation::Kind BinaryOperation::from_token_kind(const Token& t)
     }
     return static_cast<Kind>(-1);
 }
+
+const std::map<BinaryOperation::Kind, const std::string>
+BinaryOperation::kind_strings {
+        { Kind::Add, "Add" },
+        { Kind::Sub, "Sub" },
+        { Kind::Mul, "Mul" },
+        { Kind::Div, "Div" },
+        { Kind::Less, "Less" },
+        { Kind::Greater, "Greater" },
+        { Kind::Equal, "Equal" },
+        { Kind::NotEq, "NotEq" },
+        { Kind::LeEq, "LeEq" },
+        { Kind::GrEq, "GrEq" }
+};
+
+BinaryOperationRest::BinaryOperationRest(
+        BinaryOperation::Kind kind,
+        std::unique_ptr<Expression> rhs,
+        std::unique_ptr<BinaryOperationRest> rest)
+    : kind_{kind}, rhs_{std::move(rhs)}, rest_{std::move(rest)}
+{
+}
+
+BinaryOperation::Kind BinaryOperationRest::kind() const
+{
+    return kind_;
+}
+
+Expression* BinaryOperationRest::rhs() const
+{
+    return rhs_.get();
+}
+
+BinaryOperationRest*  BinaryOperationRest::rest() const
+{
+    return rest_.get();
+}
+
+UnaryOperation::UnaryOperation(Kind kind, std::unique_ptr<Expression> expr)
+        : kind_{kind}, expr{std::move(expr)}
+{
+}
+
+const std::map<UnaryOperation::Kind, const std::string>
+UnaryOperation::kind_strings {
+        { Kind::Minus, "Minus" },
+        { Kind::Not, "Not" }
+};
+
+UnaryOperation::Kind UnaryOperation::kind() const
+{
+    return kind_;
+}
+
+Expression* UnaryOperation::expression() const
+{
+    return expr.get();
+}
+
 
 IfExpr::IfExpr(std::unique_ptr<Expression> condition, std::unique_ptr<Block> body)
     : cond{std::move(condition)}, body_{std::move(body)}
@@ -262,54 +310,20 @@ const std::string& NullValue::type() const
     return type;
 }
 
-size_t PrinterVisitor::level = 0;
-
-void PrinterVisitor::print(const std::string& s)
-{
-    for (size_t i = 0; i < level; ++i) {
-        std::cout << '\t';
-    }
-    std::cout << s << '\n';
-}
-
-void PrinterVisitor::accept(Expression& e)
-{
-    print(std::string{typeid(e).name()} + " " + e.type());
-}
-
-void PrinterVisitor::accept(Block& b)
-{
-    print(std::string{typeid(b).name()});
-    auto level = LevelGuard{};
-    for (const auto& e : b.expressions()) {
-        accept(*e);
-    }
-}
-
-void PrinterVisitor::accept(Function& f)
-{
-    print(std::string{typeid(f).name()} + " " + f.name());
-    {
-        auto level = LevelGuard{};
-        for (const Parameter& param : f.parameters()) {
-            print(param.name + ", " + param.type_name);
-        }
-    }
-
-    auto level = LevelGuard{};
-    accept(*f.body());
-}
-
-void PrinterVisitor::accept(Program& p)
-{
-    print(typeid(p).name());
-    auto level = LevelGuard{};
-    for (const auto& f : p.functions()) {
-        accept(*f);
-    }
-}
-
 void Program::accept(Visitor& v) { v.accept(*this); }
 void Function::accept(Visitor& v) { v.accept(*this); }
+void Parameter::accept(Visitor& v) { v.accept(*this); }
 void Block::accept(Visitor& v) { v.accept(*this); }
-void Expression::accept(Visitor& v) { v.accept(*this); }
+void Definition::accept(Visitor& v) { v.accept(*this); }
+void Assignment::accept(Visitor& v) { v.accept(*this); }
+void BinaryOperation::accept(Visitor& v) { v.accept(*this); }
+void BinaryOperationRest::accept(Visitor& v) { v.accept(*this); }
+void UnaryOperation::accept(Visitor& v) { v.accept(*this); }
+void IfExpr::accept(Visitor& v) { v.accept(*this); }
+void WhileExpr::accept(Visitor& v) { v.accept(*this); }
+void FunctionCall::accept(Visitor& v) { v.accept(*this); }
+void Variable::accept(Visitor& v) { v.accept(*this); }
+void BoolValue::accept(Visitor& v) { v.accept(*this); }
+void IntValue::accept(Visitor& v) { v.accept(*this); }
+void FloatValue::accept(Visitor& v) { v.accept(*this); }
+void NullValue::accept(Visitor& v) { v.accept(*this); }

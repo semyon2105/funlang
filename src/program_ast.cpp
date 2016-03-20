@@ -11,4 +11,3 @@ Program* ProgramAST::root() const
 {
     return root_.get();
 }
-

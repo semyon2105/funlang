@@ -5,13 +5,14 @@
 #include <vector>
 #include <parse.h>
 
+#include "ast_printer.h"
 #include "lex.h"
 
 int main(int argc, char* argv[])
 {
+    std::cout << "---------------- Lexemes ----------------\n";
     {
-        std::ifstream ifs {"/home/semyon/Projects/funlang/example.f"};
-        ifs.sync_with_stdio(false);
+        std::ifstream ifs{"/home/semyon/Projects/funlang/example.f"};
         Funlang::Lexer lexer{ifs};
 
         size_t line = lexer.line();
@@ -25,13 +26,13 @@ int main(int argc, char* argv[])
         }
     }
 
-    std::cout << std::endl;
-
+    std::cout << "\n\n";
+    std::cout << "---------------- AST ----------------\n";
     {
         std::ifstream ifs {"/home/semyon/Projects/funlang/example.f"};
-        ifs.sync_with_stdio(false);
         Funlang::Lexer lexer{ifs};
         Funlang::Parser parser{lexer};
         Funlang::AST::ProgramAST program_tree = parser.parse_all();
+        Funlang::AST::Printer::print(*program_tree.root());
     }
 }

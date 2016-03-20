@@ -7,17 +7,16 @@
 using namespace Funlang;
 using namespace Funlang::AST;
 
-ParseError::ParseError(Token* at, size_t lineno, size_t colno)
-    : at{at}, lineno{lineno}, colno{colno}
+ParseError::ParseError(Token* at, size_t lineno)
+    : at{at}, lineno{lineno}
 {
 }
 
 UnexpectedTokenError::UnexpectedTokenError(
         Token::Kind expected,
         Token* at,
-        size_t lineno,
-        size_t colno)
-    : ParseError{at, lineno, colno}, expected{expected}
+        size_t lineno)
+    : ParseError{at, lineno}, expected{expected}
 {
 }
 
@@ -43,11 +42,11 @@ Token* Parser::lookahead(size_t offset)
 std::unique_ptr<Token> Parser::consume(Token::Kind expected_kind = (Token::Kind)0)
 {
     if (!current_token) {
-        throw ParseError{nullptr, lexer.line(), lexer.column()};
+        throw ParseError{nullptr, lexer.line()};
     }
     if (expected_kind != 0 && expected_kind != current_token->kind) {
         throw UnexpectedTokenError{expected_kind, current_token,
-                         lexer.line(), lexer.column()};
+                         lexer.line()};
     }
     auto consumed_token = std::move(*std::begin(lookahead_buffer));
     lookahead_buffer.pop_front();
@@ -92,7 +91,10 @@ std::unique_ptr<Expression> Parser::factor()
     }
     if (lookahead->kind == '-') {
         consume();
-        return std::make_unique<UnaryOperation>(UnaryOperation::Kind::Minus, expression(false));
+        consume('(');
+        auto expr = expression(false);
+        consume(')');
+        return std::make_unique<UnaryOperation>(UnaryOperation::Kind::Minus, std::move(expr));
     }
     if (lookahead->kind == '!') {
         consume();
@@ -107,21 +109,10 @@ std::unique_ptr<Expression> Parser::factor()
         consume(')');
         return expr;
     }
-    return nullptr;
+    throw ParseError{current_token, lexer.line()};
 }
 
-struct Funlang::Parser::BinOpRest
-{
-    BinOpRest(BinaryOperation::Kind kind, std::unique_ptr<Expression> rhs)
-            : kind{kind}, rhs{std::move(rhs)}
-    {
-    }
-
-    BinaryOperation::Kind kind;
-    std::unique_ptr<Expression> rhs;
-};
-
-std::unique_ptr<Parser::BinOpRest> Parser::muldiv_rest()
+std::unique_ptr<BinaryOperationRest> Parser::muldiv_rest()
 {
     Token* lookahead = this->current_token;
     if (lookahead->kind == '*' ||
@@ -130,7 +121,10 @@ std::unique_ptr<Parser::BinOpRest> Parser::muldiv_rest()
         auto binop_token = consume();
         auto binop_kind = BinaryOperation::from_token_kind(binop_token->kind);
         auto rhs = factor();
-        return std::make_unique<Parser::BinOpRest>(binop_kind, std::move(rhs));
+        auto rest = muldiv_rest();
+        return std::make_unique<BinaryOperationRest>(
+                binop_kind, std::move(rhs), std::move(rest)
+        );
     }
     return nullptr;
 }
@@ -138,20 +132,16 @@ std::unique_ptr<Parser::BinOpRest> Parser::muldiv_rest()
 std::unique_ptr<Expression> Parser::muldiv()
 {
     auto lhs = factor();
-
     auto rest = muldiv_rest();
     if (rest) {
         return std::make_unique<BinaryOperation>(
-                std::move(lhs),
-                rest->kind,
-                std::move(rest->rhs)
+                std::move(lhs), std::move(rest)
         );
     }
-
     return lhs;
 }
 
-std::unique_ptr<Parser::BinOpRest> Parser::addsub_rest()
+std::unique_ptr<BinaryOperationRest> Parser::addsub_rest()
 {
     Token* lookahead = this->current_token;
     if (lookahead->kind == '+' ||
@@ -160,7 +150,10 @@ std::unique_ptr<Parser::BinOpRest> Parser::addsub_rest()
         auto binop_token = consume();
         auto binop_kind = BinaryOperation::from_token_kind(binop_token->kind);
         auto rhs = muldiv();
-        return std::make_unique<Parser::BinOpRest>(binop_kind, std::move(rhs));
+        auto rest = addsub_rest();
+        return std::make_unique<BinaryOperationRest>(
+                binop_kind, std::move(rhs), std::move(rest)
+        );
     }
     return nullptr;
 }
@@ -168,20 +161,16 @@ std::unique_ptr<Parser::BinOpRest> Parser::addsub_rest()
 std::unique_ptr<Expression> Parser::addsub()
 {
     auto lhs = muldiv();
-
     auto rest = addsub_rest();
     if (rest) {
         return std::make_unique<BinaryOperation>(
-                std::move(lhs),
-                rest->kind,
-                std::move(rest->rhs)
+                std::move(lhs), std::move(rest)
         );
     }
-
     return lhs;
 }
 
-std::unique_ptr<Parser::BinOpRest> Parser::conditional_rest()
+std::unique_ptr<BinaryOperationRest> Parser::conditional_rest()
 {
     Token* lookahead = this->current_token;
     if (lookahead->kind == '<' ||
@@ -194,25 +183,17 @@ std::unique_ptr<Parser::BinOpRest> Parser::conditional_rest()
         auto binop_token = consume();
         auto binop_kind = BinaryOperation::from_token_kind(binop_token->kind);
         auto rhs = addsub();
-        return std::make_unique<Parser::BinOpRest>(binop_kind, std::move(rhs));
+        auto rest = conditional_rest();
+        return std::make_unique<BinaryOperationRest>(
+                binop_kind, std::move(rhs), std::move(rest)
+        );
     }
     return nullptr;
 }
 
-std::unique_ptr<Expression> Parser::operation()
+std::unique_ptr<Expression> Parser::conditional()
 {
-    auto lhs = addsub();
-
-    auto rest = conditional_rest();
-    if (rest) {
-        return std::make_unique<BinaryOperation>(
-                std::move(lhs),
-                rest->kind,
-                std::move(rest->rhs)
-        );
-    }
-
-    return lhs;
+    return std::make_unique<BinaryOperation>(addsub(), conditional_rest());
 }
 
 std::vector<std::unique_ptr<Expression>> Parser::optargs()
@@ -330,13 +311,13 @@ std::unique_ptr<Expression> Parser::expression(bool is_optional = true)
         (expr = if_expr()) ||
         (expr = while_expr()) ||
         (expr = function_call()) ||
-        (expr = operation())) {
+        (expr = conditional())) {
         return expr;
     }
     if (is_optional) {
         return nullptr;
     }
-    throw ParseError{current_token, lexer.line(), lexer.column()};
+    throw ParseError{current_token, lexer.line()};
 }
 
 std::vector<std::unique_ptr<Expression>> Parser::optexprs()
@@ -391,13 +372,13 @@ std::unique_ptr<Parameter> Parser::parameter(bool is_optional)
     return std::make_unique<Parameter>(param_name, param_typename);
 }
 
-std::vector<Parameter> Parser::optparams()
+std::vector<std::unique_ptr<Parameter>> Parser::optparams()
 {
-    std::vector<Parameter> params;
+    std::vector<std::unique_ptr<Parameter>> params;
     std::unique_ptr<Parameter> param;
     if ((param = parameter(true))) {
         while (true) {
-            params.push_back(*param);
+            params.push_back(std::move(param));
 
             if (current_token->kind != ',') {
                 break;
@@ -418,8 +399,8 @@ std::unique_ptr<Function> Parser::function()
 
     if (current_token->kind != Token::FUNCTION) {
         throw UnexpectedTokenError{
-                Token::FUNCTION, current_token,
-                lexer.line(), lexer.column()};
+                Token::FUNCTION, current_token, lexer.line()
+        };
     }
 
     auto func_keyword = consume();
@@ -439,7 +420,7 @@ std::unique_ptr<Function> Parser::function()
 
     return std::make_unique<Function>(
             func_id->name,
-            params,
+            std::move(params),
             ret_type_id->name,
             std::move(body)
     );
@@ -463,8 +444,5 @@ std::unique_ptr<Program> Parser::program()
 
 ProgramAST Parser::parse_all()
 {
-    auto program_tree = program();
-    auto printer_visitor = AST::PrinterVisitor{};
-    program_tree->accept(printer_visitor);
-    return ProgramAST{std::move(program_tree)};
+    return ProgramAST{program()};
 }

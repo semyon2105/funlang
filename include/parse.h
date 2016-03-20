@@ -12,7 +12,7 @@ namespace Funlang
 
 struct ParseError
 {
-    ParseError(Token* at, size_t lineno, size_t colno);
+    ParseError(Token* at, size_t lineno);
 
     const Token* at;
     size_t lineno;
@@ -21,7 +21,7 @@ struct ParseError
 
 struct UnexpectedTokenError : ParseError
 {
-    UnexpectedTokenError(Token::Kind expected, Token* at, size_t lineno, size_t colno);
+    UnexpectedTokenError(Token::Kind expected, Token* at, size_t lineno);
 
     const Token::Kind expected;
 };
@@ -53,7 +53,7 @@ private:
             -> std::unique_ptr<AST::Function>;
 
             auto optparams()
-                -> std::vector<AST::Parameter>;
+                -> std::vector<std::unique_ptr<AST::Parameter>>;
 
                 auto parameter(bool is_optional)
                     -> std::unique_ptr<AST::Parameter>;
@@ -85,28 +85,26 @@ private:
                             auto optargs()
                                 -> std::vector<std::unique_ptr<AST::Expression>>;
 
-                        auto operation()
-                                -> std::unique_ptr<AST::Expression>;
-
-                            struct BinOpRest;
+                        auto conditional()
+                            -> std::unique_ptr<AST::Expression>;
 
                             auto addsub()
                                 -> std::unique_ptr<AST::Expression>;
 
                                 auto muldiv()
-                                        -> std::unique_ptr<AST::Expression>;
+                                    -> std::unique_ptr<AST::Expression>;
 
                                     auto factor()
                                         -> std::unique_ptr<AST::Expression>;
 
                                     auto muldiv_rest()
-                                        -> std::unique_ptr<BinOpRest>;
+                                        -> std::unique_ptr<AST::BinaryOperationRest>;
 
                                 auto addsub_rest()
-                                    -> std::unique_ptr<BinOpRest>;
+                                    -> std::unique_ptr<AST::BinaryOperationRest>;
 
                             auto conditional_rest()
-                                -> std::unique_ptr<BinOpRest>;
+                                -> std::unique_ptr<AST::BinaryOperationRest>;
 };
 
 }
