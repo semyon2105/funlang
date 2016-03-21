@@ -71,12 +71,6 @@ const std::vector<std::unique_ptr<Expression>>& Block::expressions() const
     return exprs;
 }
 
-const std::string& Expression::type() const
-{
-    const static std::string test_type = "void";
-    return test_type;
-}
-
 Definition::Definition(
         std::string var_name,
         std::string var_type,
@@ -117,8 +111,9 @@ Expression* Assignment::expression() const
 
 BinaryOperation::BinaryOperation(
         std::unique_ptr<Expression> lhs,
-        std::unique_ptr<BinaryOperationRest> rest)
-    : lhs_{std::move(lhs)}, rest_{std::move(rest)}
+        Kind kind,
+        std::unique_ptr<Expression> rhs)
+    : lhs_{std::move(lhs)}, kind_{kind}, rhs_{std::move(rhs)}
 {
 }
 
@@ -127,9 +122,14 @@ Expression* BinaryOperation::lhs() const
     return lhs_.get();
 }
 
-BinaryOperationRest* BinaryOperation::rest() const
+BinaryOperation::Kind BinaryOperation::kind() const
 {
-    return rest_.get();
+    return kind_;
+}
+
+Expression* BinaryOperation::rhs() const
+{
+    return rhs_.get();
 }
 
 BinaryOperation::Kind BinaryOperation::from_token_kind(const Token::Kind& kind)
@@ -164,29 +164,6 @@ BinaryOperation::kind_strings {
         { Kind::GrEq, "GrEq" }
 };
 
-BinaryOperationRest::BinaryOperationRest(
-        BinaryOperation::Kind kind,
-        std::unique_ptr<Expression> rhs,
-        std::unique_ptr<BinaryOperationRest> rest)
-    : kind_{kind}, rhs_{std::move(rhs)}, rest_{std::move(rest)}
-{
-}
-
-BinaryOperation::Kind BinaryOperationRest::kind() const
-{
-    return kind_;
-}
-
-Expression* BinaryOperationRest::rhs() const
-{
-    return rhs_.get();
-}
-
-BinaryOperationRest*  BinaryOperationRest::rest() const
-{
-    return rest_.get();
-}
-
 UnaryOperation::UnaryOperation(Kind kind, std::unique_ptr<Expression> expr)
         : kind_{kind}, expr{std::move(expr)}
 {
@@ -209,7 +186,8 @@ Expression* UnaryOperation::expression() const
 }
 
 
-IfExpr::IfExpr(std::unique_ptr<Expression> condition, std::unique_ptr<Block> body)
+IfExpr::IfExpr(std::unique_ptr<Expression> condition,
+               std::unique_ptr<Expression> body)
     : cond{std::move(condition)}, body_{std::move(body)}
 {
 }
@@ -219,12 +197,13 @@ Expression* IfExpr::condition() const
     return cond.get();
 }
 
-Block* IfExpr::body() const
+Expression* IfExpr::body() const
 {
     return body_.get();
 }
 
-WhileExpr::WhileExpr(std::unique_ptr<Expression> condition, std::unique_ptr<Block> body)
+WhileExpr::WhileExpr(std::unique_ptr<Expression> condition,
+                     std::unique_ptr<Expression> body)
         : cond{std::move(condition)}, body_{std::move(body)}
 {
 }
@@ -234,7 +213,7 @@ Expression* WhileExpr::condition() const
     return cond.get();
 }
 
-Block* WhileExpr::body() const
+Expression* WhileExpr::body() const
 {
     return body_.get();
 }
@@ -272,42 +251,18 @@ BoolValue::BoolValue(bool value)
 {
 }
 
-const std::string& BoolValue::type() const
-{
-    static const std::string type = "bool";
-    return type;
-}
-
 IntValue::IntValue(int value)
-        : value{value}
+    : value{value}
 {
-}
-
-const std::string& IntValue::type() const
-{
-    static const std::string type = "int";
-    return type;
 }
 
 FloatValue::FloatValue(double value)
-        : value{value}
+    : value{value}
 {
-}
-
-const std::string& FloatValue::type() const
-{
-    static const std::string type = "float";
-    return type;
 }
 
 NullValue::NullValue()
 {
-}
-
-const std::string& NullValue::type() const
-{
-    static const std::string type = "void";
-    return type;
 }
 
 void Program::accept(Visitor& v) { v.accept(*this); }
@@ -317,7 +272,6 @@ void Block::accept(Visitor& v) { v.accept(*this); }
 void Definition::accept(Visitor& v) { v.accept(*this); }
 void Assignment::accept(Visitor& v) { v.accept(*this); }
 void BinaryOperation::accept(Visitor& v) { v.accept(*this); }
-void BinaryOperationRest::accept(Visitor& v) { v.accept(*this); }
 void UnaryOperation::accept(Visitor& v) { v.accept(*this); }
 void IfExpr::accept(Visitor& v) { v.accept(*this); }
 void WhileExpr::accept(Visitor& v) { v.accept(*this); }
@@ -327,3 +281,4 @@ void BoolValue::accept(Visitor& v) { v.accept(*this); }
 void IntValue::accept(Visitor& v) { v.accept(*this); }
 void FloatValue::accept(Visitor& v) { v.accept(*this); }
 void NullValue::accept(Visitor& v) { v.accept(*this); }
+void BlankExpr::accept(Visitor& v) { v.accept(*this); }

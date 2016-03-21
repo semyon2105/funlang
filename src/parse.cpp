@@ -92,39 +92,22 @@ std::unique_ptr<Expression> Parser::factor()
     if (lookahead->kind == '-') {
         consume();
         consume('(');
-        auto expr = expression(false);
+        auto expr = expression();
         consume(')');
         return std::make_unique<UnaryOperation>(UnaryOperation::Kind::Minus, std::move(expr));
     }
     if (lookahead->kind == '!') {
         consume();
         consume('(');
-        auto expr = expression(false);
+        auto expr = expression();
         consume(')');
         return std::make_unique<UnaryOperation>(UnaryOperation::Kind::Not, std::move(expr));
     }
     if (lookahead->kind == '(') {
         consume();
-        auto expr = expression(false);
+        auto expr = expression();
         consume(')');
         return expr;
-    }
-    throw ParseError{current_token, lexer.line()};
-}
-
-std::unique_ptr<BinaryOperationRest> Parser::muldiv_rest()
-{
-    Token* lookahead = this->current_token;
-    if (lookahead->kind == '*' ||
-        lookahead->kind == '/')
-    {
-        auto binop_token = consume();
-        auto binop_kind = BinaryOperation::from_token_kind(binop_token->kind);
-        auto rhs = factor();
-        auto rest = muldiv_rest();
-        return std::make_unique<BinaryOperationRest>(
-                binop_kind, std::move(rhs), std::move(rest)
-        );
     }
     return nullptr;
 }
@@ -132,46 +115,45 @@ std::unique_ptr<BinaryOperationRest> Parser::muldiv_rest()
 std::unique_ptr<Expression> Parser::muldiv()
 {
     auto lhs = factor();
-    auto rest = muldiv_rest();
-    if (rest) {
-        return std::make_unique<BinaryOperation>(
-                std::move(lhs), std::move(rest)
-        );
-    }
-    return lhs;
-}
 
-std::unique_ptr<BinaryOperationRest> Parser::addsub_rest()
-{
     Token* lookahead = this->current_token;
-    if (lookahead->kind == '+' ||
-        lookahead->kind == '-')
+    if (lookahead->kind == '*' ||
+        lookahead->kind == '/')
     {
-        auto binop_token = consume();
-        auto binop_kind = BinaryOperation::from_token_kind(binop_token->kind);
+        auto op_token = consume();
+        auto kind = BinaryOperation::from_token_kind(op_token->kind);
         auto rhs = muldiv();
-        auto rest = addsub_rest();
-        return std::make_unique<BinaryOperationRest>(
-                binop_kind, std::move(rhs), std::move(rest)
+        return std::make_unique<BinaryOperation>(
+                std::move(lhs), kind, std::move(rhs)
         );
     }
-    return nullptr;
+
+    return lhs;
 }
 
 std::unique_ptr<Expression> Parser::addsub()
 {
     auto lhs = muldiv();
-    auto rest = addsub_rest();
-    if (rest) {
+
+    Token* lookahead = this->current_token;
+    if (lookahead->kind == '+' ||
+        lookahead->kind == '-')
+    {
+        auto op_token = consume();
+        auto kind = BinaryOperation::from_token_kind(op_token->kind);
+        auto rhs = addsub();
         return std::make_unique<BinaryOperation>(
-                std::move(lhs), std::move(rest)
+                std::move(lhs), kind, std::move(rhs)
         );
     }
+
     return lhs;
 }
 
-std::unique_ptr<BinaryOperationRest> Parser::conditional_rest()
+std::unique_ptr<Expression> Parser::conditional()
 {
+    auto lhs = addsub();
+
     Token* lookahead = this->current_token;
     if (lookahead->kind == '<' ||
         lookahead->kind == '>' ||
@@ -180,37 +162,28 @@ std::unique_ptr<BinaryOperationRest> Parser::conditional_rest()
         lookahead->kind == Token::LE ||
         lookahead->kind == Token::GE)
     {
-        auto binop_token = consume();
-        auto binop_kind = BinaryOperation::from_token_kind(binop_token->kind);
-        auto rhs = addsub();
-        auto rest = conditional_rest();
-        return std::make_unique<BinaryOperationRest>(
-                binop_kind, std::move(rhs), std::move(rest)
+        auto op_token = consume();
+        auto kind = BinaryOperation::from_token_kind(op_token->kind);
+        auto rhs = conditional();
+        return std::make_unique<BinaryOperation>(
+                    std::move(lhs), kind, std::move(rhs)
         );
     }
-    return nullptr;
-}
 
-std::unique_ptr<Expression> Parser::conditional()
-{
-    return std::make_unique<BinaryOperation>(addsub(), conditional_rest());
+    return lhs;
 }
 
 std::vector<std::unique_ptr<Expression>> Parser::optargs()
 {
     std::vector<std::unique_ptr<Expression>> args;
     std::unique_ptr<Expression> argument;
-    if ((argument = expression(true))) {
-        while (true) {
-            args.push_back(std::move(argument));
+    while ((argument = expression())) {
+        args.push_back(std::move(argument));
 
-            if (current_token->kind != ',') {
-                break;
-            }
-            consume();
-
-            argument = expression(false);
+        if (current_token->kind != ',') {
+            break;
         }
+        consume();
     }
     return args;
 }
@@ -238,10 +211,10 @@ std::unique_ptr<WhileExpr> Parser::while_expr()
     consume();
 
     consume('(');
-    auto condition = expression(false);
+    auto condition = expression();
     consume(')');
 
-    auto body = block();
+    auto body = expression();
 
     return std::make_unique<WhileExpr>(std::move(condition), std::move(body));
 }
@@ -254,10 +227,10 @@ std::unique_ptr<IfExpr> Parser::if_expr()
     consume();
 
     consume('(');
-    auto condition = expression(false);
+    auto condition = expression();
     consume(')');
 
-    auto body = block();
+    auto body = expression();
 
     return std::make_unique<IfExpr>(std::move(condition), std::move(body));
 }
@@ -272,7 +245,7 @@ std::unique_ptr<Assignment> Parser::assignment()
 
     consume('=');
 
-    auto expr = expression(false);
+    auto expr = expression();
 
     return std::make_unique<Assignment>(var_id->name, std::move(expr));
 }
@@ -294,7 +267,7 @@ std::unique_ptr<Definition> Parser::definition()
 
     consume('=');
 
-    auto expr = expression(false);
+    auto expr = expression();
 
     return std::make_unique<Definition>(
             var_id->name,
@@ -303,10 +276,11 @@ std::unique_ptr<Definition> Parser::definition()
     );
 }
 
-std::unique_ptr<Expression> Parser::expression(bool is_optional = true)
+std::unique_ptr<Expression> Parser::expression()
 {
     std::unique_ptr<Expression> expr;
-    if ((expr = definition()) ||
+    if ((expr = block()) ||
+        (expr = definition()) ||
         (expr = assignment()) ||
         (expr = if_expr()) ||
         (expr = while_expr()) ||
@@ -314,28 +288,34 @@ std::unique_ptr<Expression> Parser::expression(bool is_optional = true)
         (expr = conditional())) {
         return expr;
     }
-    if (is_optional) {
-        return nullptr;
-    }
-    throw ParseError{current_token, lexer.line()};
+    return nullptr;
 }
 
 std::vector<std::unique_ptr<Expression>> Parser::optexprs()
 {
     std::vector<std::unique_ptr<Expression>> exprs;
-    std::unique_ptr<Expression> expr;
-    if ((expr = expression(true))) {
-        while (true) {
-            exprs.push_back(std::move(expr));
+    std::unique_ptr<Expression> expr = expression();
 
-            if (current_token->kind != ';') {
-                break;
-            }
-            consume();
+    if (!expr) {
+        return exprs;
+    }
 
-            expr = expression(false);
+    while (true) {
+        exprs.push_back(std::move(expr));
+
+        if (current_token->kind != ';') {
+            break;
+        }
+        consume();
+
+        expr = expression();
+
+        if (!expr) {
+            exprs.push_back(std::make_unique<BlankExpr>());
+            break;
         }
     }
+
     return exprs;
 }
 
@@ -343,15 +323,11 @@ std::unique_ptr<Block> Parser::block()
 {
     if (current_token->kind == '{') {
         consume();
-        std::vector<std::unique_ptr<Expression>> exprs = optexprs();
+        auto exprs = optexprs();
         consume('}');
         return std::make_unique<Block>(std::move(exprs));
     }
-
-    auto expr = expression(false);
-    auto exprs = std::vector<std::unique_ptr<Expression>>{};
-    exprs.push_back(std::move(expr));
-    return std::make_unique<Block>(std::move(exprs));
+    return nullptr;
 }
 
 std::unique_ptr<Parameter> Parser::parameter(bool is_optional)

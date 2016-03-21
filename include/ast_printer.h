@@ -31,7 +31,6 @@ public:
     void accept(Definition&) override;
     void accept(Assignment&) override;
     void accept(BinaryOperation&) override;
-    void accept(BinaryOperationRest&) override;
     void accept(UnaryOperation&) override;
     void accept(IfExpr&) override;
     void accept(WhileExpr&) override;
@@ -41,6 +40,7 @@ public:
     void accept(IntValue&) override;
     void accept(FloatValue&) override;
     void accept(NullValue&) override;
+    void accept(BlankExpr&) override;
 
 private:
     std::ostream& os;

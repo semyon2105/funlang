@@ -14,9 +14,16 @@ params_rest ::=
       ',' params
     | <empty>
 
-block ::=
-      expr
-    | '{' optexprs '}'
+expr ::=
+      block
+    | def
+    | assign
+    | if
+    | while
+    | fcall
+    | cond
+
+block ::= '{' optexprs '}'
 
 optexprs ::= exprs | <empty>
 
@@ -24,23 +31,16 @@ exprs ::= expr exprs_rest
 
 exprs_rest ::=
       ';' exprs
+    | ';'
     | <empty>
-
-expr ::=
-      def
-    | assign
-    | if
-    | while
-    | fcall
-    | cond
 
 def ::= 'let' <id> ':' <id> '=' expr
 
 assign ::= <id> '=' expr
 
-if ::= 'if' '(' expr ')' block
+if ::= 'if' '(' expr ')' expr
     
-while ::= 'while' '(' expr ')' block
+while ::= 'while' '(' expr ')' expr
 
 fcall ::= <id> '(' optargs ')'
 

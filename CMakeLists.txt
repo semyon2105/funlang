@@ -2,11 +2,11 @@ cmake_minimum_required(VERSION 3.4)
 
 project(Funlang)
 
-#find_library(LIBCXXABI_LIBRARY NAMES libc++ libc++abi)
-#if (LIBCXXABI_LIBRARY)
-#    add_compile_options(-stdlib=libc++)
-#    link_libraries(-nodefaultlibs -lc++ -lc++abi -lm -lc -lgcc_s -lgcc)
-#endif(LIBCXXABI_LIBRARY)
+find_library(LIBCXXABI_LIBRARY NAMES libc++ libc++abi)
+if (LIBCXXABI_LIBRARY)
+    add_compile_options(-stdlib=libc++)
+    link_libraries(-nodefaultlibs -lc++ -lc++abi -lm -lc -lgcc_s -lgcc)
+endif(LIBCXXABI_LIBRARY)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED on)

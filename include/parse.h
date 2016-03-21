@@ -16,7 +16,6 @@ struct ParseError
 
     const Token* at;
     size_t lineno;
-    size_t colno;
 };
 
 struct UnexpectedTokenError : ParseError
@@ -64,7 +63,7 @@ private:
                 auto optexprs()
                     -> std::vector<std::unique_ptr<AST::Expression>>;
 
-                    auto expression(bool is_optional)
+                    auto expression()
                         -> std::unique_ptr<AST::Expression>;
 
                         auto definition()
@@ -96,15 +95,6 @@ private:
 
                                     auto factor()
                                         -> std::unique_ptr<AST::Expression>;
-
-                                    auto muldiv_rest()
-                                        -> std::unique_ptr<AST::BinaryOperationRest>;
-
-                                auto addsub_rest()
-                                    -> std::unique_ptr<AST::BinaryOperationRest>;
-
-                            auto conditional_rest()
-                                -> std::unique_ptr<AST::BinaryOperationRest>;
 };
 
 }

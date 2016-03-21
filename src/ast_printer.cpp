@@ -87,7 +87,7 @@ void PrinterVisitor::accept(Block& b)
 
 void PrinterVisitor::accept(Definition& d)
 {
-    print(std::string{type_name(d)} + " " + d.type());
+    print(std::string{type_name(d)});
     auto level_guard = LevelGuard{level};
     print(std::string{"name="} + d.var_name() +
           ", static_type=" + d.var_type());
@@ -96,7 +96,7 @@ void PrinterVisitor::accept(Definition& d)
 }
 void PrinterVisitor::accept(Assignment& a)
 {
-    print(std::string{type_name(a)} + " " + a.type());
+    print(std::string{type_name(a)});
     auto level_guard = LevelGuard{level};
     print(std::string{"name="} + a.variable_name());
     print("[Assignment_RHS]");
@@ -104,36 +104,17 @@ void PrinterVisitor::accept(Assignment& a)
 }
 void PrinterVisitor::accept(BinaryOperation& b)
 {
-    print(std::string{type_name(b)} + " " + b.type());
-    auto level_guard = LevelGuard{level};
-    print("[LHS]");
-    b.lhs()->accept(*this);
-    print("[Rest]");
-    if (b.rest()) {
-        b.rest()->accept(*this);
-    }
-    else {
-        print("<Nothing>");
-    }
-}
-void PrinterVisitor::accept(BinaryOperationRest& b)
-{
-    print(type_name(b));
+    print(std::string{type_name(b)});
     auto level_guard = LevelGuard{level};
     print("kind=" + BinaryOperation::kind_strings.at(b.kind()));
+    print("[LHS]");
+    b.lhs()->accept(*this);
     print("[RHS]");
     b.rhs()->accept(*this);
-    print("[Rest]");
-    if (b.rest()) {
-        b.rest()->accept(*this);
-    }
-    else {
-        print("<Nothing>");
-    }
 }
 void PrinterVisitor::accept(UnaryOperation& u)
 {
-    print(std::string{type_name(u)} + " " + u.type());
+    print(std::string{type_name(u)});
     auto level_guard = LevelGuard{level};
     print(std::string{"kind="} + u.kind_strings.at(u.kind()));
     print("[Operand]");
@@ -141,7 +122,7 @@ void PrinterVisitor::accept(UnaryOperation& u)
 }
 void PrinterVisitor::accept(IfExpr& i)
 {
-    print(std::string{type_name(i)} + " " + i.type());
+    print(std::string{type_name(i)});
     auto level_guard = LevelGuard{level};
     print("[Condition]");
     i.condition()->accept(*this);
@@ -150,7 +131,7 @@ void PrinterVisitor::accept(IfExpr& i)
 }
 void PrinterVisitor::accept(WhileExpr& w)
 {
-    print(std::string{type_name(w)} + " " + w.type());
+    print(std::string{type_name(w)});
     auto level_guard = LevelGuard{level};
     print("[Condition]");
     w.condition()->accept(*this);
@@ -159,39 +140,43 @@ void PrinterVisitor::accept(WhileExpr& w)
 }
 void PrinterVisitor::accept(FunctionCall& f)
 {
-    print(std::string{type_name(f)} + " " + f.type());
+    print(std::string{type_name(f)});
     auto level_guard = LevelGuard{level};
     print(std::string{"name="} + f.function_name());
+    print("[Arguments]");
     for (const auto& arg : f.arguments()) {
-        print("[Argument]");
         arg->accept(*this);
     }
 }
 void PrinterVisitor::accept(Variable& v)
 {
-    print(std::string{type_name(v)} + " " + v.type());
+    print(std::string{type_name(v)});
     auto level_guard = LevelGuard{level};
     print("name=" + v.name());
 }
 void PrinterVisitor::accept(BoolValue& v)
 {
-    print(std::string{type_name(v)} + " " + v.type());
+    print(std::string{type_name(v)});
     auto level_guard = LevelGuard{level};
     print("value=" + std::to_string(v.value));
 }
 void PrinterVisitor::accept(IntValue& v)
 {
-    print(std::string{type_name(v)} + " " + v.type());
+    print(std::string{type_name(v)});
     auto level_guard = LevelGuard{level};
     print("value=" + std::to_string(v.value));
 }
 void PrinterVisitor::accept(FloatValue& v)
 {
-    print(std::string{type_name(v)} + " " + v.type());
+    print(std::string{type_name(v)});
     auto level_guard = LevelGuard{level};
     print("value=" + std::to_string(v.value));
 }
 void PrinterVisitor::accept(NullValue& v)
 {
-    print(std::string{type_name(v)} + " " + v.type());
+    print(std::string{type_name(v)});
+}
+void PrinterVisitor::accept(BlankExpr& b)
+{
+    print(std::string{type_name(b)});
 }
