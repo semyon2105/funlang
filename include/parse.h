@@ -78,9 +78,6 @@ private:
                         auto while_expr()
                             -> std::unique_ptr<AST::WhileExpr>;
 
-                        auto function_call()
-                            -> std::unique_ptr<AST::FunctionCall>;
-
                             auto optargs()
                                 -> std::vector<std::unique_ptr<AST::Expression>>;
 
@@ -95,6 +92,9 @@ private:
 
                                     auto factor()
                                         -> std::unique_ptr<AST::Expression>;
+
+                                        auto function_call()
+                                            -> std::unique_ptr<AST::FunctionCall>;
 };
 
 }

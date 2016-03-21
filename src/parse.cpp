@@ -59,9 +59,28 @@ std::unique_ptr<Token> Parser::consume(char expected_kind)
     return consume(static_cast<Token::Kind>(expected_kind));
 }
 
+std::unique_ptr<FunctionCall> Parser::function_call()
+{
+    if (current_token->kind != Token::ID || lookahead(1)->kind != '(') {
+        return nullptr;
+    }
+    auto func_id_token = consume();
+    Id* func_id = dynamic_cast<Id*>(func_id_token.get());
+
+    consume('(');
+    auto args = optargs();
+    consume(')');
+
+    return std::make_unique<FunctionCall>(func_id->name, std::move(args));
+}
+
 std::unique_ptr<Expression> Parser::factor()
 {
     Token* lookahead = this->current_token;
+    auto fcall = function_call();
+    if (fcall) {
+        return std::move(fcall);
+    }
     if (lookahead->kind == Token::ID) {
         auto id_token = consume();
         Id* id = dynamic_cast<Id*>(id_token.get());
@@ -69,6 +88,7 @@ std::unique_ptr<Expression> Parser::factor()
     }
     if (lookahead->kind == Token::INT) {
         auto integer_token = consume();
+
         Int* integer = dynamic_cast<Int*>(integer_token.get());
         return std::make_unique<IntValue>(integer->value);
     }
@@ -188,21 +208,6 @@ std::vector<std::unique_ptr<Expression>> Parser::optargs()
     return args;
 }
 
-std::unique_ptr<FunctionCall> Parser::function_call()
-{
-    if (current_token->kind != Token::ID || lookahead(1)->kind != '(') {
-        return nullptr;
-    }
-    auto func_id_token = consume();
-    Id* func_id = dynamic_cast<Id*>(func_id_token.get());
-
-    consume('(');
-    auto args = optargs();
-    consume(')');
-
-    return std::make_unique<FunctionCall>(func_id->name, std::move(args));
-}
-
 std::unique_ptr<WhileExpr> Parser::while_expr()
 {
     if (current_token->kind != Token::WHILE) {
@@ -284,7 +289,6 @@ std::unique_ptr<Expression> Parser::expression()
         (expr = assignment()) ||
         (expr = if_expr()) ||
         (expr = while_expr()) ||
-        (expr = function_call()) ||
         (expr = conditional())) {
         return expr;
     }

@@ -1,0 +1,11 @@
+function factorial(n:int) : int
+{
+    let result : int = 1;
+    if (n > 0) result = n * factorial(n - 1);
+    result
+}
+
+function main() : int
+{
+    print(factorial(10));
+}
