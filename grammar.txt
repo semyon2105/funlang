@@ -1,83 +1,33 @@
 program ::= functions
 
-functions ::= function optfunctions
-
-optfunctions ::= functions | <empty>
+functions ::= function+
 
 function ::= 'function' <id> '(' optparams ')' ':' <id> block
 
-optparams ::= params | <empty>
+optparams ::= params?
 
-params ::= <id> ':' <id> params_rest
+params ::= <id> ':' <id> (',' params)*
 
-params_rest ::=
-      ',' params
-    | <empty>
-
-expr ::=
-      block
-    | def
-    | assign
-    | if
-    | while
-    | cond
+expr ::= block | cond
 
 block ::= '{' optexprs '}'
 
-optexprs ::= exprs | <empty>
+optexprs ::= exprs?
 
-exprs ::= expr exprs_rest
+exprs ::= expr (';' exprs)*
 
-exprs_rest ::=
-      ';' exprs
-    | ';'
-    | <empty>
+cond ::= addsub (('<'|'>'|'=='|'!='|'<='|'>=') addsub)*
 
-def ::= 'let' <id> ':' <id> '=' expr
+addsub ::= muldiv (('+'|'-') muldiv)*
 
-assign ::= <id> '=' expr
+muldiv ::= primary (('*'|'/') primary)*
 
-if ::= 'if' '(' expr ')' expr
-    
-while ::= 'while' '(' expr ')' expr
-
-fcall ::= <id> '(' optargs ')'
-
-optargs ::= args | <empty>
-
-args ::= expr args_rest
-
-args_rest ::=
-      ',' args
-    | <empty>
-
-cond ::= addsub cond_rest
-
-cond_rest ::=
-      '<' addsub cond_rest
-    | '>' addsub cond_rest
-    | '==' addsub cond_rest
-    | '!=' addsub cond_rest
-    | '<=' addsub cond_rest
-    | '>=' addsub cond_rest
-    | <empty>
-
-addsub ::= muldiv addsub_rest
-
-addsub_rest ::=
-      '+' muldiv addsub_rest
-    | '-' muldiv addsub_rest
-    | <empty>
-
-muldiv ::= factor muldiv_rest
-
-muldiv_rest ::=
-      '*' factor muldiv_rest
-    | '/' factor muldiv_rest
-    | <empty>
-
-factor ::=
-      fcall
+primary ::=
+      def
+    | assign
+    | if_else
+    | while
+    | fcall
     | <id>
     | <integer>
     | <float_number>
@@ -87,3 +37,17 @@ factor ::=
     | '-' '(' expr ')'
     | '!' '(' expr ')'
     | '(' expr ')'
+
+def ::= 'let' <id> ':' <id> '=' expr
+
+assign ::= <id> '=' expr
+
+if_else ::= 'if' '(' expr ')' expr ('else' expr)?
+    
+while ::= 'while' '(' expr ')' expr
+
+fcall ::= <id> '(' optargs ')'
+
+optargs ::= args?
+
+args ::= expr (',' args)*
