@@ -73,7 +73,7 @@ void PrinterVisitor::accept(Parameter& p)
 {
     print(std::string{type_name(p)});
     auto level_guard = LevelGuard{level};
-    print(p.name() + " : " + p.type_name());
+    print("name=" + p.name() + ", type=" + p.type_name());
 }
 
 void PrinterVisitor::accept(Block& b)
@@ -120,14 +120,18 @@ void PrinterVisitor::accept(UnaryOperation& u)
     print("[Operand]");
     u.expression()->accept(*this);
 }
-void PrinterVisitor::accept(IfExpr& i)
+void PrinterVisitor::accept(IfElseExpr& i)
 {
     print(std::string{type_name(i)});
     auto level_guard = LevelGuard{level};
     print("[Condition]");
     i.condition()->accept(*this);
-    print("[Body]");
-    i.body()->accept(*this);
+    print("[If_Body]");
+    i.if_body()->accept(*this);
+    if (i.else_body()) {
+        print("[Else_Body]");
+        i.else_body()->accept(*this);
+    }
 }
 void PrinterVisitor::accept(WhileExpr& w)
 {

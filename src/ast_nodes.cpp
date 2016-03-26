@@ -186,20 +186,29 @@ Expression* UnaryOperation::expression() const
 }
 
 
-IfExpr::IfExpr(std::unique_ptr<Expression> condition,
-               std::unique_ptr<Expression> body)
-    : cond{std::move(condition)}, body_{std::move(body)}
+IfElseExpr::IfElseExpr(
+        std::unique_ptr<Expression> condition,
+        std::unique_ptr<Expression> if_body,
+        std::unique_ptr<Expression> else_body)
+    : cond{std::move(condition)},
+      if_body_{std::move(if_body)},
+      else_body_{std::move(else_body)}
 {
 }
 
-Expression* IfExpr::condition() const
+Expression* IfElseExpr::condition() const
 {
     return cond.get();
 }
 
-Expression* IfExpr::body() const
+Expression* IfElseExpr::if_body() const
 {
-    return body_.get();
+    return if_body_.get();
+}
+
+Expression* IfElseExpr::else_body() const
+{
+    return else_body_.get();
 }
 
 WhileExpr::WhileExpr(std::unique_ptr<Expression> condition,
@@ -273,7 +282,7 @@ void Definition::accept(Visitor& v) { v.accept(*this); }
 void Assignment::accept(Visitor& v) { v.accept(*this); }
 void BinaryOperation::accept(Visitor& v) { v.accept(*this); }
 void UnaryOperation::accept(Visitor& v) { v.accept(*this); }
-void IfExpr::accept(Visitor& v) { v.accept(*this); }
+void IfElseExpr::accept(Visitor& v) { v.accept(*this); }
 void WhileExpr::accept(Visitor& v) { v.accept(*this); }
 void FunctionCall::accept(Visitor& v) { v.accept(*this); }
 void Variable::accept(Visitor& v) { v.accept(*this); }

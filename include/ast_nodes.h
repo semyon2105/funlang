@@ -23,7 +23,7 @@ class Definition;
 class Assignment;
 class BinaryOperation;
 class UnaryOperation;
-class IfExpr;
+class IfElseExpr;
 class WhileExpr;
 class FunctionCall;
 class Variable;
@@ -43,7 +43,7 @@ struct Visitor
     virtual void accept(Assignment&) = 0;
     virtual void accept(BinaryOperation&) = 0;
     virtual void accept(UnaryOperation&) = 0;
-    virtual void accept(IfExpr&) = 0;
+    virtual void accept(IfElseExpr&) = 0;
     virtual void accept(WhileExpr&) = 0;
     virtual void accept(FunctionCall&) = 0;
     virtual void accept(Variable&) = 0;
@@ -218,20 +218,24 @@ private:
     const std::unique_ptr<Expression> expr;
 };
 
-class IfExpr : public Expression
+class IfElseExpr : public Expression
 {
 public:
-    IfExpr(std::unique_ptr<Expression> condition,
-           std::unique_ptr<Expression> body);
+    IfElseExpr(
+            std::unique_ptr<Expression> condition,
+            std::unique_ptr<Expression> if_body,
+            std::unique_ptr<Expression> else_body = nullptr);
 
     Expression* condition() const;
-    Expression* body() const;
+    Expression* if_body() const;
+    Expression* else_body() const;
 
     void accept(Visitor&) override;
 
 private:
     const std::unique_ptr<Expression> cond;
-    const std::unique_ptr<Expression> body_;
+    const std::unique_ptr<Expression> if_body_;
+    const std::unique_ptr<Expression> else_body_;
 };
 
 class WhileExpr : public Expression

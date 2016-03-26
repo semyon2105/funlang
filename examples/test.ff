@@ -8,17 +8,27 @@ function main() : int
 
 function other(a:int, b:float) : float
 {
-    let n1 : float = if (a > b) a;
+    let n1 : float = if (a > b) { a };
     let n2 : int = while (b >= a) { a = a + 1 };
     let n3 : void = null;
     let n4 : bool = !(true);
 
     let abracadabra : float =
-        if (a > b < a * b) {
-            while (a + b > 10)
-                let abc : float = a + b *
-                    (while (true) 1234.5) /
-                    a - b / a;
+        if (a > a * b) {
+            while (a + b > 10) {
+                let abc : float = a + b
+            };
             { lol; }; { print(null); let x : float = .123 }; { };
+            if (a != b) {
+                a
+            }
         }
+        else if (-a != !(b>a)) {
+            01234
+        }
+        else {
+            b
+        };
+
+    if (n4) { if (!n4) { 123 } } else { 321 }
 }

@@ -1,18 +1,12 @@
-program ::= functions
+program ::= function+
 
-functions ::= function+
-
-function ::= 'function' <id> '(' optparams ')' ':' <id> block
-
-optparams ::= params?
+function ::= 'function' <id> '(' params? ')' ':' <id> block
 
 params ::= <id> ':' <id> (',' params)*
 
 expr ::= block | cond
 
-block ::= '{' optexprs '}'
-
-optexprs ::= exprs?
+block ::= '{' exprs? '}'
 
 exprs ::= expr (';' exprs)*
 
@@ -34,20 +28,22 @@ primary ::=
     | 'true'
     | 'false'
     | 'null'
-    | '-' '(' expr ')'
-    | '!' '(' expr ')'
+    | '-' primary
+    | '!' primary
     | '(' expr ')'
 
 def ::= 'let' <id> ':' <id> '=' expr
 
 assign ::= <id> '=' expr
 
-if_else ::= 'if' '(' expr ')' expr ('else' expr)?
-    
-while ::= 'while' '(' expr ')' expr
+if_else ::= 'if' '(' expr ')' block ('else' else_tail)?
 
-fcall ::= <id> '(' optargs ')'
+else_tail ::=
+      if_else
+    | block
 
-optargs ::= args?
+while ::= 'while' '(' expr ')' block
 
-args ::= expr (',' args)*
+fcall ::= <id> '(' args? ')'
+
+args ::= expr (',' expr)*

@@ -74,12 +74,108 @@ std::unique_ptr<FunctionCall> Parser::function_call()
     return std::make_unique<FunctionCall>(func_id->name, std::move(args));
 }
 
-std::unique_ptr<Expression> Parser::factor()
+std::unique_ptr<WhileExpr> Parser::while_expr()
+{
+    if (current_token->kind != Token::WHILE) {
+        return nullptr;
+    }
+    consume();
+
+    consume('(');
+    auto condition = expression();
+    consume(')');
+
+    auto body = block();
+
+    return std::make_unique<WhileExpr>(std::move(condition), std::move(body));
+}
+
+std::unique_ptr<Expression> Parser::else_tail()
+{
+    auto if_else = if_else_expr();
+    if (if_else) {
+        return if_else;
+    }
+    return block();
+}
+
+std::unique_ptr<Expression> Parser::if_else_expr()
+{
+    if (current_token->kind != Token::IF) {
+        return nullptr;
+    }
+
+    consume();
+    consume('(');
+    auto condition = expression();
+    consume(')');
+
+    auto if_body = block();
+
+    if (current_token->kind != Token::ELSE) {
+        return std::make_unique<IfElseExpr>(std::move(condition), std::move(if_body));
+    }
+
+    consume();
+    auto else_body = else_tail();
+
+    return std::make_unique<IfElseExpr>(
+                std::move(condition),
+                std::move(if_body),
+                std::move(else_body));
+}
+
+std::unique_ptr<Assignment> Parser::assignment()
+{
+    if (current_token->kind != Token::ID || lookahead(1)->kind != '=') {
+        return nullptr;
+    }
+    auto var_id_token = consume();
+    Id* var_id = dynamic_cast<Id*>(var_id_token.get());
+
+    consume('=');
+
+    auto expr = expression();
+
+    return std::make_unique<Assignment>(var_id->name, std::move(expr));
+}
+
+std::unique_ptr<Definition> Parser::definition()
+{
+    if (current_token->kind != Token::LET) {
+        return nullptr;
+    }
+    consume();
+
+    auto var_id_token = consume(Token::ID);
+    Id* var_id = dynamic_cast<Id*>(var_id_token.get());
+
+    consume(':');
+
+    auto type_id_token = consume(Token::ID);
+    Id* type_id = dynamic_cast<Id*>(type_id_token.get());
+
+    consume('=');
+
+    auto expr = expression();
+
+    return std::make_unique<Definition>(
+            var_id->name,
+            type_id->name,
+            std::move(expr)
+    );
+}
+
+std::unique_ptr<Expression> Parser::primary()
 {
     Token* lookahead = this->current_token;
-    auto fcall = function_call();
-    if (fcall) {
-        return std::move(fcall);
+    std::unique_ptr<Expression> pr;
+    if ((pr = definition()) ||
+        (pr = assignment()) ||
+        (pr = if_else_expr()) ||
+        (pr = while_expr()) ||
+        (pr = function_call())) {
+        return pr;
     }
     if (lookahead->kind == Token::ID) {
         auto id_token = consume();
@@ -111,17 +207,11 @@ std::unique_ptr<Expression> Parser::factor()
     }
     if (lookahead->kind == '-') {
         consume();
-        consume('(');
-        auto expr = expression();
-        consume(')');
-        return std::make_unique<UnaryOperation>(UnaryOperation::Kind::Minus, std::move(expr));
+        return std::make_unique<UnaryOperation>(UnaryOperation::Kind::Minus, primary());
     }
     if (lookahead->kind == '!') {
         consume();
-        consume('(');
-        auto expr = expression();
-        consume(')');
-        return std::make_unique<UnaryOperation>(UnaryOperation::Kind::Not, std::move(expr));
+        return std::make_unique<UnaryOperation>(UnaryOperation::Kind::Not, primary());
     }
     if (lookahead->kind == '(') {
         consume();
@@ -134,7 +224,7 @@ std::unique_ptr<Expression> Parser::factor()
 
 std::unique_ptr<Expression> Parser::muldiv()
 {
-    auto lhs = factor();
+    auto lhs = primary();
 
     Token* lookahead = this->current_token;
     if (lookahead->kind == '*' ||
@@ -208,88 +298,10 @@ std::vector<std::unique_ptr<Expression>> Parser::optargs()
     return args;
 }
 
-std::unique_ptr<WhileExpr> Parser::while_expr()
-{
-    if (current_token->kind != Token::WHILE) {
-        return nullptr;
-    }
-    consume();
-
-    consume('(');
-    auto condition = expression();
-    consume(')');
-
-    auto body = expression();
-
-    return std::make_unique<WhileExpr>(std::move(condition), std::move(body));
-}
-
-std::unique_ptr<IfExpr> Parser::if_expr()
-{
-    if (current_token->kind != Token::IF) {
-        return nullptr;
-    }
-    consume();
-
-    consume('(');
-    auto condition = expression();
-    consume(')');
-
-    auto body = expression();
-
-    return std::make_unique<IfExpr>(std::move(condition), std::move(body));
-}
-
-std::unique_ptr<Assignment> Parser::assignment()
-{
-    if (current_token->kind != Token::ID || lookahead(1)->kind != '=') {
-        return nullptr;
-    }
-    auto var_id_token = consume();
-    Id* var_id = dynamic_cast<Id*>(var_id_token.get());
-
-    consume('=');
-
-    auto expr = expression();
-
-    return std::make_unique<Assignment>(var_id->name, std::move(expr));
-}
-
-std::unique_ptr<Definition> Parser::definition()
-{
-    if (current_token->kind != Token::LET) {
-        return nullptr;
-    }
-    consume();
-
-    auto var_id_token = consume(Token::ID);
-    Id* var_id = dynamic_cast<Id*>(var_id_token.get());
-
-    consume(':');
-
-    auto type_id_token = consume(Token::ID);
-    Id* type_id = dynamic_cast<Id*>(type_id_token.get());
-
-    consume('=');
-
-    auto expr = expression();
-
-    return std::make_unique<Definition>(
-            var_id->name,
-            type_id->name,
-            std::move(expr)
-    );
-}
-
 std::unique_ptr<Expression> Parser::expression()
 {
     std::unique_ptr<Expression> expr;
-    if ((expr = block()) ||
-        (expr = definition()) ||
-        (expr = assignment()) ||
-        (expr = if_expr()) ||
-        (expr = while_expr()) ||
-        (expr = conditional())) {
+    if ((expr = block()) || (expr = conditional())) {
         return expr;
     }
     return nullptr;
@@ -301,6 +313,7 @@ std::vector<std::unique_ptr<Expression>> Parser::optexprs()
     std::unique_ptr<Expression> expr = expression();
 
     if (!expr) {
+        exprs.push_back(std::make_unique<BlankExpr>());
         return exprs;
     }
 

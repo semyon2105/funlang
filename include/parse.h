@@ -66,21 +66,6 @@ private:
                     auto expression()
                         -> std::unique_ptr<AST::Expression>;
 
-                        auto definition()
-                            -> std::unique_ptr<AST::Definition>;
-
-                        auto assignment()
-                            -> std::unique_ptr<AST::Assignment>;
-
-                        auto if_expr()
-                            -> std::unique_ptr<AST::IfExpr>;
-
-                        auto while_expr()
-                            -> std::unique_ptr<AST::WhileExpr>;
-
-                            auto optargs()
-                                -> std::vector<std::unique_ptr<AST::Expression>>;
-
                         auto conditional()
                             -> std::unique_ptr<AST::Expression>;
 
@@ -90,11 +75,29 @@ private:
                                 auto muldiv()
                                     -> std::unique_ptr<AST::Expression>;
 
-                                    auto factor()
+                                    auto primary()
                                         -> std::unique_ptr<AST::Expression>;
+
+                                        auto definition()
+                                            -> std::unique_ptr<AST::Definition>;
+
+                                        auto assignment()
+                                            -> std::unique_ptr<AST::Assignment>;
+
+                                        auto if_else_expr()
+                                            -> std::unique_ptr<AST::Expression>;
+
+                                            auto else_tail()
+                                                -> std::unique_ptr<AST::Expression>;
+
+                                        auto while_expr()
+                                            -> std::unique_ptr<AST::WhileExpr>;
 
                                         auto function_call()
                                             -> std::unique_ptr<AST::FunctionCall>;
+
+                                            auto optargs()
+                                                -> std::vector<std::unique_ptr<AST::Expression>>;
 };
 
 }

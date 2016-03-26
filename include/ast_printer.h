@@ -32,7 +32,7 @@ public:
     void accept(Assignment&) override;
     void accept(BinaryOperation&) override;
     void accept(UnaryOperation&) override;
-    void accept(IfExpr&) override;
+    void accept(IfElseExpr&) override;
     void accept(WhileExpr&) override;
     void accept(FunctionCall&) override;
     void accept(Variable&) override;

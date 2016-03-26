@@ -12,7 +12,7 @@ int main(int argc, char* argv[])
 {
     std::cout << "---------------- Lexemes ----------------\n";
     {
-        std::ifstream ifs{"/home/semyon/Projects/funlang/examples/factorial.ff"};
+        std::ifstream ifs{"/home/semyon/Projects/funlang/examples/test.ff"};
         Funlang::Lexer lexer{ifs};
 
         size_t line = lexer.line();
@@ -29,7 +29,7 @@ int main(int argc, char* argv[])
     std::cout << "\n\n";
     std::cout << "---------------- AST ----------------\n";
     {
-        std::ifstream ifs {"/home/semyon/Projects/funlang/examples/factorial.ff"};
+        std::ifstream ifs {"/home/semyon/Projects/funlang/examples/test.ff"};
         Funlang::Lexer lexer{ifs};
         Funlang::Parser parser{lexer};
         Funlang::AST::ProgramAST program_tree = parser.parse_all();
