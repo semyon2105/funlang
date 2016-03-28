@@ -27,5 +27,9 @@
 *.out
 *.app
 
+# QtCreator
+*.autosave
+*.user
+
 # CLion
 .idea

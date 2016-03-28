@@ -94,6 +94,7 @@ void PrinterVisitor::accept(Definition& d)
     print("[Definition_RHS]");
     d.expression()->accept(*this);
 }
+
 void PrinterVisitor::accept(Assignment& a)
 {
     print(std::string{type_name(a)});
@@ -102,6 +103,7 @@ void PrinterVisitor::accept(Assignment& a)
     print("[Assignment_RHS]");
     a.expression()->accept(*this);
 }
+
 void PrinterVisitor::accept(BinaryOperation& b)
 {
     print(std::string{type_name(b)});
@@ -112,6 +114,7 @@ void PrinterVisitor::accept(BinaryOperation& b)
     print("[RHS]");
     b.rhs()->accept(*this);
 }
+
 void PrinterVisitor::accept(UnaryOperation& u)
 {
     print(std::string{type_name(u)});
@@ -120,6 +123,7 @@ void PrinterVisitor::accept(UnaryOperation& u)
     print("[Operand]");
     u.expression()->accept(*this);
 }
+
 void PrinterVisitor::accept(IfElseExpr& i)
 {
     print(std::string{type_name(i)});
@@ -133,6 +137,7 @@ void PrinterVisitor::accept(IfElseExpr& i)
         i.else_body()->accept(*this);
     }
 }
+
 void PrinterVisitor::accept(WhileExpr& w)
 {
     print(std::string{type_name(w)});
@@ -142,6 +147,7 @@ void PrinterVisitor::accept(WhileExpr& w)
     print("[Body]");
     w.body()->accept(*this);
 }
+
 void PrinterVisitor::accept(FunctionCall& f)
 {
     print(std::string{type_name(f)});
@@ -152,34 +158,40 @@ void PrinterVisitor::accept(FunctionCall& f)
         arg->accept(*this);
     }
 }
+
 void PrinterVisitor::accept(Variable& v)
 {
     print(std::string{type_name(v)});
     auto level_guard = LevelGuard{level};
     print("name=" + v.name());
 }
+
 void PrinterVisitor::accept(BoolValue& v)
 {
     print(std::string{type_name(v)});
     auto level_guard = LevelGuard{level};
     print("value=" + std::to_string(v.value));
 }
+
 void PrinterVisitor::accept(IntValue& v)
 {
     print(std::string{type_name(v)});
     auto level_guard = LevelGuard{level};
     print("value=" + std::to_string(v.value));
 }
+
 void PrinterVisitor::accept(FloatValue& v)
 {
     print(std::string{type_name(v)});
     auto level_guard = LevelGuard{level};
     print("value=" + std::to_string(v.value));
 }
+
 void PrinterVisitor::accept(NullValue& v)
 {
     print(std::string{type_name(v)});
 }
+
 void PrinterVisitor::accept(BlankExpr& b)
 {
     print(std::string{type_name(b)});

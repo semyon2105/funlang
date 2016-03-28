@@ -9,7 +9,7 @@ function main() : int
 function other(a:int, b:float) : float
 {
     let n1 : float = if (a > b) { a };
-    let n2 : int = while (b >= a) { a = a + 1 };
+    let n2 : int = while (a = b >= a) { a = a + 1 };
     let n3 : void = null;
     let n4 : bool = !(true);
 
