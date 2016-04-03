@@ -12,12 +12,12 @@ std::string type_name(const T& t)
     return boost::core::demangle(typeid(t).name());
 }
 
-void Printer::print(Node& tree)
+void AST::print(Node& tree)
 {
     print(std::cout, tree);
 }
 
-void Printer::print(std::ostream& os, Node& tree)
+void AST::print(std::ostream& os, Node& tree)
 {
     auto printer_visitor = PrinterVisitor{os};
     tree.accept(printer_visitor);

@@ -5,7 +5,6 @@
 
 #include "ast_nodes.h"
 #include "lex.h"
-#include "program_ast.h"
 
 namespace Funlang
 {
@@ -30,7 +29,7 @@ class Parser
 public:
     Parser(Lexer& lexer);
 
-    AST::ProgramAST parse_all();
+    std::unique_ptr<AST::Program> parse_all();
 
 private:
     Lexer& lexer;

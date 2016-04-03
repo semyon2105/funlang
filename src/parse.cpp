@@ -435,7 +435,7 @@ std::unique_ptr<Program> Parser::program()
     return std::make_unique<Program>(functions());
 }
 
-ProgramAST Parser::parse_all()
+std::unique_ptr<Program> Parser::parse_all()
 {
-    return ProgramAST{program()};
+    return program();
 }

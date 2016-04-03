@@ -2,14 +2,12 @@
 #define FUNLANG_CODEGEN_H
 
 #include <unordered_map>
-#include <vector>
 
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 
 #include "ast_nodes.h"
-#include "program_ast.h"
 
 namespace Funlang
 {
@@ -17,7 +15,7 @@ namespace Funlang
 namespace AST
 {
 
-llvm::Value* codegen(ProgramAST&, llvm::LLVMContext& = llvm::getGlobalContext());
+void codegen(Program&, llvm::LLVMContext& = llvm::getGlobalContext());
 
 namespace impl
 {
@@ -40,26 +38,63 @@ private:
     std::vector<std::unordered_map<std::string, llvm::Value*>> tables;
 };
 
-class CodegenVisitor : private Visitor
+class Codegen : private Visitor
 {
 public:
-    CodegenVisitor(Node& node, llvm::LLVMContext&, llvm::Module&);
+    Codegen(llvm::LLVMContext&);
 
-    llvm::Value* result();
+    llvm::Value* generate(Node&);
+
+    llvm::Module& get_module();
 
 private:
-    struct ScopeGuard;
-
-    Node& root;
     llvm::LLVMContext& context;
-    llvm::Module& module;
 
+    llvm::Module module;
     llvm::IRBuilder<> builder;
     ScopedSymbolTable named_values;
 
-    llvm::Value* latest_result;
+    llvm::Value* generate(Program&);
 
-    llvm::Value* generate(Node&);
+    llvm::Value* generate(Function&);
+    llvm::Value* generateFunction(Function&, std::function<llvm::Value*()>);
+
+    llvm::Value* generate(Parameter&);
+    llvm::Value* generate(Block&);
+    llvm::Value* generate(Definition&);
+    llvm::Value* generate(Assignment&);
+    llvm::Value* generate(BinaryOperation&);
+    llvm::Value* generate(UnaryOperation&);
+    llvm::Value* generate(IfElseExpr&);
+    llvm::Value* generate(WhileExpr&);
+    llvm::Value* generate(FunctionCall&);
+    llvm::Value* generate(Variable&);
+    llvm::Value* generate(BoolValue&);
+    llvm::Value* generate(IntValue&);
+    llvm::Value* generate(FloatValue&);
+    llvm::Value* generate(NullValue&);
+    llvm::Value* generate(BlankExpr&);
+
+    void add_utility_functions();
+    llvm::Function* add_main_function();
+
+    llvm::Value* match_bool_binop(BinaryOperation::Kind,
+                                  llvm::Value*, llvm::Value*);
+    llvm::Value* match_int_binop(BinaryOperation::Kind,
+                                  llvm::Value*, llvm::Value*);
+    llvm::Value* match_numeric_binop(BinaryOperation::Kind,
+                                  llvm::Value*, llvm::Value*);
+
+    llvm::Type* common_type(const std::vector<llvm::Value*>&);
+
+    std::vector<llvm::Value*> convert_numeric_to_float(std::vector<llvm::Value*>&&);
+
+    llvm::AllocaInst* create_entry_block_alloca(llvm::Function*, llvm::Type*,
+                                                const std::string&);
+
+    llvm::Type* builtin_type_from_string(const std::string&);
+
+    llvm::Value* __llvm_value;
 
     void accept(Program&) override;
     void accept(Function&) override;
@@ -78,21 +113,6 @@ private:
     void accept(FloatValue&) override;
     void accept(NullValue&) override;
     void accept(BlankExpr&) override;
-
-    llvm::Value* match_bool_binop(BinaryOperation::Kind,
-                                  llvm::Value*, llvm::Value*);
-    llvm::Value* match_int_binop(BinaryOperation::Kind,
-                                  llvm::Value*, llvm::Value*);
-    llvm::Value* match_numeric_binop(BinaryOperation::Kind,
-                                  llvm::Value*, llvm::Value*);
-
-    llvm::Type* common_type(const std::vector<llvm::Value*>&);
-
-    std::vector<llvm::Value*> convert_numeric_to_float(std::vector<llvm::Value*>&&);
-
-    llvm::AllocaInst* create_entry_block_alloca(llvm::Function*, llvm::Type*,
-                                                const std::string&);
-    llvm::Type* builtin_type_from_string(const std::string&);
 };
 
 }

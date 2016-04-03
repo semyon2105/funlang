@@ -9,12 +9,8 @@ namespace Funlang
 namespace AST
 {
 
-class Printer
-{
-public:
-    static void print(Node& tree);
-    static void print(std::ostream& os, Node& tree);
-};
+void print(Node& tree);
+void print(std::ostream& os, Node& tree);
 
 namespace impl
 {

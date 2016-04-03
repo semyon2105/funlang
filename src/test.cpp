@@ -15,7 +15,7 @@ int main(int argc, char* argv[])
 {
     std::cout << "---------------- Lexemes ----------------\n";
     {
-        std::ifstream ifs{"/home/semyon/Projects/funlang/examples/fib.ff"};
+        std::ifstream ifs{argv[1]};
         Funlang::Lexer lexer{ifs};
 
         size_t line = lexer.line();
@@ -30,12 +30,12 @@ int main(int argc, char* argv[])
     }
 
     std::cout << "\n\n---------------- AST ----------------\n";
-    std::ifstream ifs {"/home/semyon/Projects/funlang/examples/fib.ff"};
+    std::ifstream ifs {argv[1]};
     Funlang::Lexer lexer{ifs};
     Funlang::Parser parser{lexer};
-    Funlang::AST::ProgramAST program_tree = parser.parse_all();
-    Funlang::AST::Printer::print(*program_tree.root());
-    std::cout << "\n\n--------------- IR -----------------\n";
-    llvm::Value* code = Funlang::AST::codegen(program_tree);
-    code->dump();
+    auto program = parser.parse_all();
+    Funlang::AST::print(*program);
+
+    std::cout << "\n\n--------------- LLVM IR -----------------\n";
+    Funlang::AST::codegen(*program);
 }

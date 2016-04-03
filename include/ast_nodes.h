@@ -78,12 +78,12 @@ public:
     Function(std::string name,
              std::vector<std::unique_ptr<Parameter>> params,
              std::string return_type,
-             std::unique_ptr<Block> body);
+             std::unique_ptr<Expression> body);
 
     const std::string& name() const;
     const std::vector<std::unique_ptr<Parameter>>& parameters() const;
     const std::string& return_type() const;
-    Block* body() const;
+    Expression* body() const;
 
     void accept(Visitor&) override;
 
@@ -91,7 +91,7 @@ private:
     const std::string name_;
     const std::vector<std::unique_ptr<Parameter>> params_;
     const std::string return_type_;
-    const std::unique_ptr<Block> body_;
+    const std::unique_ptr<Expression> body_;
 };
 
 class Parameter : public Node

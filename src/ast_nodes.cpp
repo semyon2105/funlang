@@ -18,7 +18,7 @@ const std::vector<std::unique_ptr<Function>>& Program::functions() const
 Function::Function(std::string name,
                    std::vector<std::unique_ptr<Parameter>> params,
                    std::string return_type,
-                   std::unique_ptr<Block> body)
+                   std::unique_ptr<Expression> body)
     : name_{std::move(name)},
       params_{std::move(params)},
       return_type_{std::move(return_type)},
@@ -41,7 +41,7 @@ const std::string& Function::return_type() const
     return return_type_;
 }
 
-Block* Function::body() const
+Expression* Function::body() const
 {
     return body_.get();
 }
