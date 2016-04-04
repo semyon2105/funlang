@@ -463,7 +463,7 @@ Value* Codegen::generate(WhileExpr& w)
     func->getBasicBlockList().push_back(loop_exit_bb);
     builder.SetInsertPoint(loop_exit_bb);
 
-    return builder.CreateLoad(loop_result_alloca, "loopresulttmp");
+    return nullptr;
 }
 
 Value* Codegen::generate(FunctionCall& f)
