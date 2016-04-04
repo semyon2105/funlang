@@ -15,7 +15,7 @@ namespace Funlang
 namespace AST
 {
 
-void codegen(Program&, llvm::LLVMContext& = llvm::getGlobalContext());
+std::string codegen(Program&, llvm::LLVMContext& = llvm::getGlobalContext());
 
 namespace impl
 {

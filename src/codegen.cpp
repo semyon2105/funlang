@@ -1,7 +1,10 @@
 #include <memory>
 
+#include <boost/core/demangle.hpp>
+
 #include <llvm/IR/TypeBuilder.h>
 #include <llvm/IR/Verifier.h>
+#include <llvm/Support/raw_ostream.h>
 
 #include "codegen.h"
 
@@ -26,11 +29,14 @@ struct InvalidBinaryOperationError      : CodegenError {};
 struct UnexpectedBlankExpressionError   : CodegenError {};
 struct MainFunctionNotDefined           : CodegenError {};
 
-void AST::codegen(Program& program, LLVMContext& context)
+std::string AST::codegen(Program& program,  LLVMContext& context)
 {
     Codegen visitor{context};
     visitor.generate(static_cast<Node&>(program));
-    visitor.get_module().dump();
+    std::string output;
+    raw_string_ostream os {output};
+    visitor.get_module().print(os, nullptr);
+    return output;
 }
 
 ScopedSymbolTable::ScopedSymbolTable()
@@ -118,7 +124,6 @@ void Codegen::add_utility_functions()
                 "scanf", &module);
     scanf_func->setCallingConv(CallingConv::C);
 
-
     std::vector<std::unique_ptr<Parameter>> params;
     params.emplace_back(std::make_unique<Parameter>("value", "float"));
     AST::Function print_float_prototype {
@@ -135,15 +140,16 @@ void Codegen::add_utility_functions()
                     module, ArrayType::get(
                         IntegerType::get(context, 8), format.length() + 1
                     ),
-                    true, GlobalValue::PrivateLinkage, format_cstr, "format");
+                    true, GlobalValue::PrivateLinkage, format_cstr, "printf_format");
         Constant* zero =
                 Constant::getNullValue(IntegerType::getInt32Ty(context));
-        Constant* format_ref = ConstantExpr::getGetElementPtr(
-                    gv->getType(), gv, std::vector<Constant*>{zero, zero});
+        Value* format_ref = builder.CreateInBoundsGEP(gv, {zero, zero});
 
-
+        Variable float_value_arg {"value"};
         CallInst* call = builder.CreateCall(
-                    printf_func, {format_ref, named_values["value"]});
+                    printf_func,
+                    {format_ref, generate(float_value_arg)}
+        );
         call->setTailCall(false);
         return nullptr;
     });
@@ -162,26 +168,24 @@ void Codegen::add_utility_functions()
                     module, ArrayType::get(
                         IntegerType::get(context, 8), format.length() + 1
                     ),
-                    true, GlobalValue::PrivateLinkage, format_cstr, "str");
+                    true, GlobalValue::PrivateLinkage, format_cstr, "scanf_format");
         Constant* zero =
                 Constant::getNullValue(IntegerType::getInt32Ty(context));
-        Constant* format_ref = ConstantExpr::getGetElementPtr(
-                    format_gv->getType(), format_gv, std::vector<Constant*>{zero, zero});
+        Value* format_ref = builder.CreateInBoundsGEP(format_gv, {zero, zero});
 
         llvm::Function* function = builder.GetInsertBlock()->getParent();
 
-        GlobalVariable* float_gv = new GlobalVariable(
-                    module, Type::getDoubleTy(context),
-                    false, GlobalValue::PrivateLinkage,
-                    ConstantFP::getNullValue(Type::getDoubleTy(context)),
-                    "input_float");
-        Value* float_ref = builder.CreateGEP(float_gv, {zero, zero});
+        auto func = builder.GetInsertBlock()->getParent();
+        AllocaInst* float_alloca = create_entry_block_alloca(
+                    func, Type::getDoubleTy(context), "input_float");
+
+        Value* float_ref = builder.CreateInBoundsGEP(float_alloca, {zero});
 
         CallInst* call = builder.CreateCall(
                     scanf_func, {format_ref, float_ref});
         call->setTailCall(false);
 
-        return float_gv;
+        return builder.CreateLoad(float_alloca, "floattmp");
     });
 }
 
