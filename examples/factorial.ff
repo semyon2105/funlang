@@ -1,6 +1,6 @@
 function factorial(n:float) : float
 {
-    if (n > 0) {
+    if n > 0 {
         n * factorial(n - 1)
     }
     else { 1.0 }

@@ -3,10 +3,10 @@ function fib(i:float) : float
     let lo : float = 0.0;
     let hi : float = 1.0;
     let current : float = 0.0;
-    while (current < i) {
+    while current < i {
         current = current + 1;
         hi = lo + hi;
-        lo = hi - lo
+        lo = hi - lo;
     };
     lo
 }
