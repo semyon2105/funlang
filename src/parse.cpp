@@ -81,9 +81,7 @@ std::unique_ptr<WhileExpr> Parser::while_expr()
     }
     consume();
 
-    consume('(');
     auto condition = expression();
-    consume(')');
 
     auto body = block();
 
@@ -106,9 +104,7 @@ std::unique_ptr<Expression> Parser::if_else_expr()
     }
 
     consume();
-    consume('(');
     auto condition = expression();
-    consume(')');
 
     auto if_body = block();
 

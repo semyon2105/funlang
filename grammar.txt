@@ -36,13 +36,13 @@ def ::= 'let' <id> ':' <id> '=' expr
 
 assign ::= <id> '=' expr
 
-if_else ::= 'if' '(' expr ')' block ('else' else_tail)?
+if_else ::= 'if' expr block ('else' else_tail)?
 
 else_tail ::=
       if_else
     | block
 
-while ::= 'while' '(' expr ')' block
+while ::= 'while' expr block
 
 fcall ::= <id> '(' args? ')'
 
