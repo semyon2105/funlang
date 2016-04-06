@@ -449,9 +449,6 @@ Value* Codegen::generate(WhileExpr& w)
     func->getBasicBlockList().push_back(loop_bb);
     builder.SetInsertPoint(loop_bb);
     Value* body = generate(*w.body());
-    if (!body) {
-        throw CodegenError{};
-    }
 
     AllocaInst* loop_result_alloca =
             create_entry_block_alloca(func, body->getType(), "loopresult");
