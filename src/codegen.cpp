@@ -147,7 +147,7 @@ void Codegen::add_utility_functions()
         Variable float_value_arg {"value"};
         CallInst* call = builder.CreateCall(
                     printf_func,
-                    {format_ref, generate(float_value_arg)}
+                    {format_ref, rvalue(generate(float_value_arg))}
         );
         call->setTailCall(false);
         return nullptr;
