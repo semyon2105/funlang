@@ -3,6 +3,7 @@
 
 #include <unordered_map>
 
+#include "llvm/CodeGen/ValueTypes.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
@@ -62,7 +63,6 @@ private:
     llvm::Value* generate(Parameter&);
     llvm::Value* generate(Block&);
     llvm::Value* generate(Definition&);
-    llvm::Value* generate(Assignment&);
     llvm::Value* generate(BinaryOperation&);
     llvm::Value* generate(UnaryOperation&);
     llvm::Value* generate(IfElseExpr&);
@@ -78,12 +78,19 @@ private:
     void add_utility_functions();
     llvm::Function* add_main_function();
 
+    llvm::Value* match_binop(BinaryOperation::Kind,
+                             llvm::Value*, llvm::Value*);
     llvm::Value* match_bool_binop(BinaryOperation::Kind,
                                   llvm::Value*, llvm::Value*);
     llvm::Value* match_int_binop(BinaryOperation::Kind,
-                                  llvm::Value*, llvm::Value*);
+                                 llvm::Value*, llvm::Value*);
     llvm::Value* match_numeric_binop(BinaryOperation::Kind,
-                                  llvm::Value*, llvm::Value*);
+                                     llvm::Value*, llvm::Value*);
+    llvm::Value* match_assignment_binop(BinaryOperation::Kind,
+                                        llvm::Value*, llvm::Value*);
+
+    llvm::Value* rvalue(llvm::Value*);
+    std::vector<llvm::Value*> rvalue(std::vector<llvm::Value*>);
 
     llvm::Type* common_type(const std::vector<llvm::Value*>&);
 
@@ -92,7 +99,8 @@ private:
     llvm::AllocaInst* create_entry_block_alloca(llvm::Function*, llvm::Type*,
                                                 const std::string&);
 
-    llvm::Type* builtin_type_from_string(const std::string&);
+    llvm::Type* get_builtin_type(const std::string&);
+    llvm::Type* type_check(const std::string&, llvm::Type*);
 
     llvm::Value* __llvm_value;
 
@@ -101,7 +109,6 @@ private:
     void accept(Parameter&) override;
     void accept(Block&) override;
     void accept(Definition&) override;
-    void accept(Assignment&) override;
     void accept(BinaryOperation&) override;
     void accept(UnaryOperation&) override;
     void accept(IfElseExpr&) override;

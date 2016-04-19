@@ -95,15 +95,6 @@ void PrinterVisitor::accept(Definition& d)
     d.expression()->accept(*this);
 }
 
-void PrinterVisitor::accept(Assignment& a)
-{
-    print(std::string{type_name(a)});
-    auto level_guard = LevelGuard{level};
-    print(std::string{"name="} + a.variable_name());
-    print("[Assignment_RHS]");
-    a.expression()->accept(*this);
-}
-
 void PrinterVisitor::accept(BinaryOperation& b)
 {
     print(std::string{type_name(b)});

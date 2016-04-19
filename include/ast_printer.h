@@ -25,7 +25,6 @@ public:
     void accept(Parameter&) override;
     void accept(Block&) override;
     void accept(Definition&) override;
-    void accept(Assignment&) override;
     void accept(BinaryOperation&) override;
     void accept(UnaryOperation&) override;
     void accept(IfElseExpr&) override;

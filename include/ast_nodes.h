@@ -20,7 +20,6 @@ class Function;
 class Expression;
 class Block;
 class Definition;
-class Assignment;
 class BinaryOperation;
 class UnaryOperation;
 class IfElseExpr;
@@ -40,7 +39,6 @@ struct Visitor
     virtual void accept(Parameter&) = 0;
     virtual void accept(Block&) = 0;
     virtual void accept(Definition&) = 0;
-    virtual void accept(Assignment&) = 0;
     virtual void accept(BinaryOperation&) = 0;
     virtual void accept(UnaryOperation&) = 0;
     virtual void accept(IfElseExpr&) = 0;
@@ -144,26 +142,12 @@ private:
     const std::unique_ptr<Expression> expr;
 };
 
-class Assignment : public Expression
-{
-public:
-    Assignment(std::string variable_name, std::unique_ptr<Expression> expression);
-
-    const std::string& variable_name() const;
-    Expression* expression() const;
-
-    void accept(Visitor&) override;
-
-private:
-    const std::string var_name;
-    const std::unique_ptr<Expression> expr;
-};
-
 class BinaryOperation : public Expression
 {
 public:
     enum class Kind
     {
+        Assign,
         Add,
         Sub,
         Mul,

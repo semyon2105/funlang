@@ -94,21 +94,6 @@ Expression* Definition::expression() const
     return expr.get();
 }
 
-Assignment::Assignment(std::string variable_name, std::unique_ptr<Expression> expression)
-    : var_name{std::move(variable_name)}, expr{std::move(expression)}
-{
-}
-
-const std::string& Assignment::variable_name() const
-{
-    return var_name;
-}
-
-Expression* Assignment::expression() const
-{
-    return expr.get();
-}
-
 BinaryOperation::BinaryOperation(
         std::unique_ptr<Expression> lhs,
         Kind kind,
@@ -135,6 +120,7 @@ Expression* BinaryOperation::rhs() const
 BinaryOperation::Kind BinaryOperation::from_token_kind(const Token::Kind& kind)
 {
     switch (kind) {
+        case (Token::Kind)'=': return Kind::Assign;
         case (Token::Kind)'+': return Kind::Add;
         case (Token::Kind)'-': return Kind::Sub;
         case (Token::Kind)'*': return Kind::Mul;
@@ -145,13 +131,13 @@ BinaryOperation::Kind BinaryOperation::from_token_kind(const Token::Kind& kind)
         case Token::NEQ: return Kind::NotEq;
         case Token::LE: return Kind::LeEq;
         case Token::GE: return Kind::GrEq;
-        default: break;
+        default: return static_cast<Kind>(-1);
     }
-    return static_cast<Kind>(-1);
 }
 
 const std::map<BinaryOperation::Kind, const std::string>
 BinaryOperation::kind_strings {
+        { Kind::Assign, "Assign"},
         { Kind::Add, "Add" },
         { Kind::Sub, "Sub" },
         { Kind::Mul, "Mul" },
@@ -279,7 +265,6 @@ void Function::accept(Visitor& v) { v.accept(*this); }
 void Parameter::accept(Visitor& v) { v.accept(*this); }
 void Block::accept(Visitor& v) { v.accept(*this); }
 void Definition::accept(Visitor& v) { v.accept(*this); }
-void Assignment::accept(Visitor& v) { v.accept(*this); }
 void BinaryOperation::accept(Visitor& v) { v.accept(*this); }
 void UnaryOperation::accept(Visitor& v) { v.accept(*this); }
 void IfElseExpr::accept(Visitor& v) { v.accept(*this); }

@@ -1,3 +1,4 @@
+#include <functional>
 #include <memory>
 
 #include <boost/core/demangle.hpp>
@@ -48,7 +49,7 @@ struct ScopedSymbolTable::ScopeGuard
 {
     std::vector<std::unordered_map<std::string, Value*>>& tables;
 
-    ScopeGuard(std::vector<std::unordered_map<std::string, Value*>>& tables)
+    explicit ScopeGuard(std::vector<std::unordered_map<std::string, Value*>>& tables)
         : tables{tables}
     {
         tables.push_back(std::unordered_map<std::string, Value*>{});
@@ -65,7 +66,6 @@ ScopedSymbolTable::ScopeGuard ScopedSymbolTable::make_inner_scope()
     return ScopeGuard{tables};
 }
 
-// Поиск llvm::Value* переменной в таблицах символов, начиная с самой вложенной
 Value*& ScopedSymbolTable::value(const std::string& key)
 {
     for (auto table_iter = std::rbegin(tables);
@@ -78,7 +78,6 @@ Value*& ScopedSymbolTable::value(const std::string& key)
         }
     }
 
-    // всегда nullptr
     return (*std::begin(tables))[key];
 }
 
@@ -227,10 +226,10 @@ Value* Codegen::generateFunction(AST::Function& f, std::function<Value*()> body_
     std::transform(std::cbegin(f.parameters()), std::cend(f.parameters()),
                    std::back_inserter(param_types),
                    [this](const auto& param) {
-        return builtin_type_from_string(param->type_name());
+        return get_builtin_type(param->type_name());
     });
 
-    Type* static_return_type = builtin_type_from_string(f.return_type());
+    Type* static_return_type = get_builtin_type(f.return_type());
     FunctionType* func_type =
             FunctionType::get(
                 static_return_type,
@@ -260,13 +259,10 @@ Value* Codegen::generateFunction(AST::Function& f, std::function<Value*()> body_
             named_values.value_from_current_scope(arg.getName()) = alloca;
         }
 
-        Value* return_value = body_gen();
-        Type* static_type = builtin_type_from_string(f.return_type());
+        Value* return_value = rvalue(body_gen());
         if (return_value) {
-            if (static_type != return_value->getType()) {
-                throw TypeMismatchError{};
-            }
-            if (return_value->getType()->isVoidTy()) {
+            Type* type = type_check(f.return_type(), return_value->getType());
+            if (type->isVoidTy()) {
                 builder.CreateRetVoid();
             }
             else {
@@ -274,9 +270,7 @@ Value* Codegen::generateFunction(AST::Function& f, std::function<Value*()> body_
             }
         }
         else {
-            if (static_type != Type::getVoidTy(context)) {
-                throw TypeMismatchError{};
-            }
+            type_check(f.return_type(), Type::getVoidTy(context));
             builder.CreateRetVoid();
         }
     }
@@ -304,32 +298,15 @@ Value* Codegen::generate(Definition& d)
 {
     llvm::Function* function = builder.GetInsertBlock()->getParent();
 
-    Value* rvalue = generate(*d.expression());
-    if (!rvalue) {
+    Value* rhs = rvalue(generate(*d.expression()));
+    if (!rhs) {
         throw UnexpectedBlankExpressionError{};
     }
-    Type* type = builtin_type_from_string(d.var_type());
-    if (type != rvalue->getType()) {
-        throw TypeMismatchError{};
-    }
+    Type* type = type_check(d.var_type(), rhs->getType());
     AllocaInst* alloca = create_entry_block_alloca(function, type, d.var_name());
-    builder.CreateStore(rvalue, alloca);
+    builder.CreateStore(rhs, alloca);
     named_values.value_from_current_scope(d.var_name()) = alloca;
-    return rvalue;
-}
-
-Value* Codegen::generate(Assignment& a)
-{
-    Value* rvalue = generate(*a.expression());
-    if (!rvalue) {
-        throw UnexpectedBlankExpressionError{};
-    }
-    Value* variable = named_values[a.variable_name()];
-    if (!variable) {
-        throw UndefinedVariableError{};
-    }
-    builder.CreateStore(rvalue, variable);
-    return rvalue;
+    return rhs;
 }
 
 Value* Codegen::generate(BinaryOperation& b)
@@ -340,21 +317,16 @@ Value* Codegen::generate(BinaryOperation& b)
         throw UnexpectedBlankExpressionError{};
     }
 
-    Value* binop;
-    if ((binop = match_bool_binop(b.kind(), lhs, rhs)) ||
-        (binop = match_int_binop(b.kind(), lhs, rhs)) ||
-        (binop = match_numeric_binop(b.kind(), lhs, rhs)))
-    {
-        return binop;
-    }
-    else {
+    Value* binop = match_binop(b.kind(), lhs, rhs);
+    if (!binop) {
         throw InvalidExpressionError{};
     }
+    return binop;
 }
 
 Value* Codegen::generate(UnaryOperation& u)
 {
-    Value* expr = generate(*u.expression());
+    Value* expr = rvalue(generate(*u.expression()));
     if (!expr) {
         throw UnexpectedBlankExpressionError{};
     }
@@ -374,7 +346,7 @@ Value* Codegen::generate(IfElseExpr& i)
 {
     llvm::Function* func = builder.GetInsertBlock()->getParent();
 
-    Value* cond = generate(*i.condition());
+    Value* cond = rvalue(generate(*i.condition()));
 
     if (!cond->getType()->isIntegerTy(1)) {
         throw TypeError{};
@@ -435,11 +407,12 @@ Value* Codegen::generate(WhileExpr& w)
     builder.CreateBr(header_bb);
 
     builder.SetInsertPoint(header_bb);
-    Value* condition = generate(*w.condition());
+    Value* condition = rvalue(generate(*w.condition()));
     if (!condition) {
         throw CodegenError{};
     }
     if (!condition->getType()->isIntegerTy(1)) {
+        condition->getType()->dump();
         throw TypeError{};
     }
     header_bb = builder.GetInsertBlock();
@@ -470,7 +443,7 @@ Value* Codegen::generate(FunctionCall& f)
 
     std::vector<Value*> actual_args;
     for (const auto& arg : f.arguments()) {
-        actual_args.push_back(generate(*arg));
+        actual_args.push_back(rvalue(generate(*arg)));
         if (!actual_args.back()) {
             throw UnexpectedBlankExpressionError{};
         }
@@ -481,11 +454,7 @@ Value* Codegen::generate(FunctionCall& f)
 
 Value* Codegen::generate(Variable& v)
 {
-    Value* value = named_values[v.name()];
-    if (!value) {
-        throw UndefinedVariableError{};
-    }
-    return builder.CreateLoad(value, v.name().c_str());
+    return named_values[v.name()];
 }
 
 Value* Codegen::generate(BoolValue& v)
@@ -513,21 +482,38 @@ Value* Codegen::generate(BlankExpr&)
     return nullptr;
 }
 
-Value* Codegen::match_bool_binop(BinaryOperation::Kind kind,
-                                        Value* lhs, Value* rhs)
+Value* Codegen::match_binop(BinaryOperation::Kind kind,
+                            Value* lhs, Value* rhs)
 {
-    if (!lhs || !rhs) {
-        return nullptr;
+    Value* rval_rhs = rvalue(rhs);
+    Value* assignment = match_assignment_binop(kind, lhs, rval_rhs);
+    if (assignment) {
+        return assignment;
     }
-    auto types = {lhs->getType(), rhs->getType()};
+
+    Value* rval_lhs = rvalue(lhs);
+    Value* binop = nullptr;
+    if ((binop = match_bool_binop(kind, rval_lhs, rval_rhs)) ||
+        (binop = match_int_binop(kind, rval_lhs, rval_rhs)) ||
+        (binop = match_numeric_binop(kind, rval_lhs, rval_rhs)))
+    {
+        return binop;
+    }
+    return nullptr;
+}
+
+Value* Codegen::match_bool_binop(BinaryOperation::Kind kind,
+                                 Value* rval_lhs, Value* rval_rhs)
+{
+    auto types = {rval_lhs->getType(), rval_rhs->getType()};
     auto is_bool = [](Type* t) { return t->isIntegerTy(1); };
-    // build binop if lhs and rhs are bools
+    // build a binop if both lhs and rhs are bools
     if (std::all_of(std::cbegin(types), std::cend(types), is_bool)) {
         switch (kind) {
         case BinaryOperation::Kind::Equal:
-            return builder.CreateICmpEQ(lhs, rhs, "cmpeqtmp");
+            return builder.CreateICmpEQ(rval_lhs, rval_rhs, "cmpeqtmp");
         case BinaryOperation::Kind::NotEq:
-            return builder.CreateICmpNE(lhs, rhs, "cmpnetmp");
+            return builder.CreateICmpNE(rval_lhs, rval_rhs, "cmpnetmp");
         default:
             throw InvalidBinaryOperationError{};
         }
@@ -541,75 +527,110 @@ Value* Codegen::match_bool_binop(BinaryOperation::Kind kind,
 }
 
 Value* Codegen::match_int_binop(BinaryOperation::Kind kind,
-                                       Value* lhs, Value* rhs)
+                                Value* rval_lhs, Value* rval_rhs)
 {
-    if (!lhs || !rhs) {
-        return nullptr;
-    }
-    auto types = {lhs->getType(), rhs->getType()};
+    auto types = {rval_lhs->getType(), rval_rhs->getType()};
     auto is_int = [](Type* t) { return t->isIntegerTy(32); };
     // build if both operands are ints
     if (std::all_of(std::cbegin(types), std::cend(types), is_int)) {
         switch (kind) {
         case BinaryOperation::Kind::Add:
-            return builder.CreateAdd(lhs, rhs, "addtmp");
+            return builder.CreateAdd(rval_lhs, rval_rhs, "addtmp");
         case BinaryOperation::Kind::Sub:
-            return builder.CreateSub(lhs, rhs, "subtmp");
+            return builder.CreateSub(rval_lhs, rval_rhs, "subtmp");
         case BinaryOperation::Kind::Mul:
-            return builder.CreateMul(lhs, rhs, "multmp");
+            return builder.CreateMul(rval_lhs, rval_rhs, "multmp");
         case BinaryOperation::Kind::Div:
-            return builder.CreateSDiv(lhs, rhs, "sdivtmp");
+            return builder.CreateSDiv(rval_lhs, rval_rhs, "sdivtmp");
         case BinaryOperation::Kind::Less:
-            return builder.CreateICmpSLT(lhs, rhs, "cmpslttmp");
+            return builder.CreateICmpSLT(rval_lhs, rval_rhs, "cmpslttmp");
         case BinaryOperation::Kind::Greater:
-            return builder.CreateICmpSGT(lhs, rhs, "cmpsgttmp");
+            return builder.CreateICmpSGT(rval_lhs, rval_rhs, "cmpsgttmp");
         case BinaryOperation::Kind::Equal:
-            return builder.CreateICmpEQ(lhs, rhs, "cmpeqtmp");
+            return builder.CreateICmpEQ(rval_lhs, rval_rhs, "cmpeqtmp");
         case BinaryOperation::Kind::NotEq:
-            return builder.CreateICmpNE(lhs, rhs, "cmpnetmp");
+            return builder.CreateICmpNE(rval_lhs, rval_rhs, "cmpnetmp");
         case BinaryOperation::Kind::LeEq:
-            return builder.CreateICmpSLE(lhs, rhs, "cmpsletmp");
+            return builder.CreateICmpSLE(rval_lhs, rval_rhs, "cmpsletmp");
         case BinaryOperation::Kind::GrEq:
-            return builder.CreateICmpSGE(lhs, rhs, "cmpsgetmp");
+            return builder.CreateICmpSGE(rval_lhs, rval_rhs, "cmpsgetmp");
+        default:
+            throw InvalidBinaryOperationError{};
         }
     }
-
     return nullptr;
 }
 
 Value* Codegen::match_numeric_binop(BinaryOperation::Kind kind,
-                                           Value* lhs, Value* rhs)
+                                    Value* rval_lhs, Value* rval_rhs)
 {
-    if (!lhs || !rhs) {
+    auto is_numeric = [](Type* t) {
+        return t->isIntegerTy(32) || t->isDoubleTy();
+    };
+
+    if (!is_numeric(rval_lhs->getType())
+        || !is_numeric(rval_rhs->getType())) {
         return nullptr;
     }
-    auto numbers = convert_numeric_to_float(std::vector<Value*>{lhs, rhs});
-    lhs = numbers[0];
-    rhs = numbers[1];
+    auto numbers = convert_numeric_to_float(
+                std::vector<Value*>{rval_lhs, rval_rhs});
+    rval_lhs = numbers[0];
+    rval_rhs = numbers[1];
     switch (kind) {
     case BinaryOperation::Kind::Add:
-        return builder.CreateFAdd(lhs, rhs, "addtmp");
+        return builder.CreateFAdd(rval_lhs, rval_rhs, "addtmp");
     case BinaryOperation::Kind::Sub:
-        return builder.CreateFSub(lhs, rhs, "subtmp");
+        return builder.CreateFSub(rval_lhs, rval_rhs, "subtmp");
     case BinaryOperation::Kind::Mul:
-        return builder.CreateFMul(lhs, rhs, "multmp");
+        return builder.CreateFMul(rval_lhs, rval_rhs, "multmp");
     case BinaryOperation::Kind::Div:
-        return builder.CreateFDiv(lhs, rhs, "sdivtmp");
+        return builder.CreateFDiv(rval_lhs, rval_rhs, "sdivtmp");
     case BinaryOperation::Kind::Less:
-        return builder.CreateFCmpULT(lhs, rhs, "cmpulttmp");
+        return builder.CreateFCmpULT(rval_lhs, rval_rhs, "cmpulttmp");
     case BinaryOperation::Kind::Greater:
-        return builder.CreateFCmpUGT(lhs, rhs, "cmpugttmp");
+        return builder.CreateFCmpUGT(rval_lhs, rval_rhs, "cmpugttmp");
     case BinaryOperation::Kind::Equal:
-        return builder.CreateFCmpUEQ(lhs, rhs, "cmpueqtmp");
+        return builder.CreateFCmpUEQ(rval_lhs, rval_rhs, "cmpueqtmp");
     case BinaryOperation::Kind::NotEq:
-        return builder.CreateFCmpUNE(lhs, rhs, "cmpunetmp");
+        return builder.CreateFCmpUNE(rval_lhs, rval_rhs, "cmpunetmp");
     case BinaryOperation::Kind::LeEq:
-        return builder.CreateFCmpULE(lhs, rhs, "cmpuletmp");
+        return builder.CreateFCmpULE(rval_lhs, rval_rhs, "cmpuletmp");
     case BinaryOperation::Kind::GrEq:
-        return builder.CreateFCmpUGE(lhs, rhs, "cmpugetmp");
+        return builder.CreateFCmpUGE(rval_lhs, rval_rhs, "cmpugetmp");
+    default:
+        throw InvalidBinaryOperationError{};
+    }
+}
+
+Value* Codegen::match_assignment_binop(BinaryOperation::Kind kind,
+                                       Value* lhs, Value* rval_rhs)
+{
+    if (kind == BinaryOperation::Kind::Assign) {
+        builder.CreateStore(rval_rhs, lhs);
+        return rval_rhs;
     }
     return nullptr;
 }
+
+Value* Codegen::rvalue(Value* value)
+{
+    if (!value) {
+        return nullptr;
+    }
+    Value* rval = nullptr;
+    if (isa<AllocaInst>(value)) {
+        rval = builder.CreateLoad(value);
+    }
+    return rval ? rval : value;
+}
+
+std::vector<Value*> Codegen::rvalue(std::vector<Value*> values)
+{
+    std::for_each(std::begin(values), std::end(values),
+                  [this](Value* v) { return rvalue(v); });
+    return values;
+}
+
 
 AllocaInst* Codegen::create_entry_block_alloca(
         llvm::Function* function,
@@ -623,21 +644,34 @@ AllocaInst* Codegen::create_entry_block_alloca(
     return tmp_builder.CreateAlloca(var_type, nullptr, var_name.c_str());
 }
 
-llvm::Type* Codegen::builtin_type_from_string(const std::string& name)
+llvm::Type* Codegen::get_builtin_type(const std::string& type_name)
 {
-    if (name == "bool") {
+    if (type_name == "bool") {
         return Type::getInt1Ty(context);
     }
-    if (name == "int") {
+    if (type_name == "int") {
         return Type::getInt32Ty(context);
     }
-    if (name == "float") {
+    if (type_name == "float") {
         return Type::getDoubleTy(context);
     }
-    if (name == "void") {
+    if (type_name == "void") {
         return Type::getVoidTy(context);
     }
     throw NoSuchTypeError{};
+}
+
+llvm::Type* Codegen::type_check(const std::string& type_name, Type* deducted)
+{
+    if (type_name == "") {
+        return deducted;
+    }
+    Type* static_type = get_builtin_type(type_name);
+    deducted->dump();
+    if (static_type != deducted) {
+        throw TypeMismatchError{};
+    }
+    return static_type;
 }
 
 Type* Codegen::common_type(const std::vector<Value*>& values)
@@ -656,16 +690,6 @@ Type* Codegen::common_type(const std::vector<Value*>& values)
 
 std::vector<Value*> Codegen::convert_numeric_to_float(std::vector<Value*>&& values)
 {
-    auto is_number = [](Value* v) {
-        if (!v) return false;
-        Type* t = v->getType();
-        return t->isIntegerTy(32) || t->isDoubleTy();
-    };
-
-    if (!std::all_of(std::cbegin(values), std::cend(values), is_number)) {
-        throw TypeError{};
-    }
-
     for (Value*& value : values) {
         value = builder.CreateSIToFP(
                     value, Type::getDoubleTy(context), "sitofptmp");
@@ -683,7 +707,6 @@ void Codegen::accept(AST::Function& n)   { __llvm_value = generate(n); };
 void Codegen::accept(Parameter& n)       { __llvm_value = generate(n); };
 void Codegen::accept(Block& n)           { __llvm_value = generate(n); };
 void Codegen::accept(Definition& n)      { __llvm_value = generate(n); };
-void Codegen::accept(Assignment& n)      { __llvm_value = generate(n); };
 void Codegen::accept(BinaryOperation& n) { __llvm_value = generate(n); };
 void Codegen::accept(UnaryOperation& n)  { __llvm_value = generate(n); };
 void Codegen::accept(IfElseExpr& n)      { __llvm_value = generate(n); };

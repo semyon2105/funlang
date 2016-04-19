@@ -1,8 +1,8 @@
 function fib(i:float) : float
 {
-    let lo : float = 0.0;
-    let hi : float = 1.0;
-    let current : float = 0.0;
+    let lo = 0.0;
+    let hi = 1.0;
+    let current = 0.0;
     while current < i {
         current = current + 1;
         hi = lo + hi;

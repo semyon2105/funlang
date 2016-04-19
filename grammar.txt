@@ -4,11 +4,13 @@ function ::= 'function' <id> '(' params? ')' ':' <id> block
 
 params ::= <id> ':' <id> (',' params)*
 
-expr ::= block | cond
+expr ::= block | assign
 
 block ::= '{' exprs? '}'
 
 exprs ::= expr (';' exprs)*
+
+assign ::= cond ('=' cond)*
 
 cond ::= addsub (('<'|'>'|'=='|'!='|'<='|'>=') addsub)*
 
@@ -18,7 +20,6 @@ muldiv ::= primary (('*'|'/') primary)*
 
 primary ::=
       def
-    | assign
     | if_else
     | while
     | fcall
@@ -32,9 +33,7 @@ primary ::=
     | '!' primary
     | '(' expr ')'
 
-def ::= 'let' <id> ':' <id> '=' expr
-
-assign ::= <id> '=' expr
+def ::= 'let' <id> (':' <id>)? '=' expr
 
 if_else ::= 'if' expr block ('else' else_tail)?
 
