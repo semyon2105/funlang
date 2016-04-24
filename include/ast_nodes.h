@@ -25,6 +25,7 @@ class UnaryOperation;
 class IfElseExpr;
 class WhileExpr;
 class FunctionCall;
+class LValue;
 class Variable;
 class BoolValue;
 class IntValue;
@@ -109,6 +110,7 @@ private:
 
 struct Expression : public Node
 {
+    virtual ~Expression() {}
 };
 
 class Block : public Expression
@@ -127,19 +129,20 @@ private:
 class Definition : public Expression
 {
 public:
-    Definition(std::string var_name, std::string var_type, std::unique_ptr<Expression> expr);
+    Definition(std::unique_ptr<LValue> lvalue,
+               std::string type,
+               std::unique_ptr<Expression> rhs);
 
-    const std::string& var_name() const;
-    const std::string& var_type() const;
-
-    Expression* expression() const;
+    LValue* lvalue() const;
+    const std::string& type() const;
+    Expression* rhs() const;
 
     void accept(Visitor&) override;
 
 private:
-    const std::string var_name_;
-    const std::string var_type_;
-    const std::unique_ptr<Expression> expr;
+    const std::unique_ptr<LValue> lvalue_;
+    const std::string type_;
+    const std::unique_ptr<Expression> rhs_;
 };
 
 class BinaryOperation : public Expression
@@ -255,7 +258,12 @@ private:
 
 };
 
-class Variable : public Expression
+struct LValue : public Expression
+{
+    virtual ~LValue() {}
+};
+
+class Variable : public LValue
 {
 public:
     Variable(std::string name);

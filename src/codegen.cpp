@@ -30,7 +30,7 @@ struct InvalidBinaryOperationError      : CodegenError {};
 struct UnexpectedBlankExpressionError   : CodegenError {};
 struct MainFunctionNotDefined           : CodegenError {};
 
-std::string AST::codegen(Program& program,  LLVMContext& context)
+std::string AST::codegen(Program& program, LLVMContext& context)
 {
     Codegen visitor{context};
     visitor.generate(static_cast<Node&>(program));
@@ -147,7 +147,7 @@ void Codegen::add_utility_functions()
         Variable float_value_arg {"value"};
         CallInst* call = builder.CreateCall(
                     printf_func,
-                    {format_ref, generate(float_value_arg)}
+                    {format_ref, rvalue(generate(float_value_arg))}
         );
         call->setTailCall(false);
         return nullptr;
@@ -298,14 +298,21 @@ Value* Codegen::generate(Definition& d)
 {
     llvm::Function* function = builder.GetInsertBlock()->getParent();
 
-    Value* rhs = rvalue(generate(*d.expression()));
+    Value* rhs = rvalue(generate(*d.rhs()));
     if (!rhs) {
         throw UnexpectedBlankExpressionError{};
     }
-    Type* type = type_check(d.var_type(), rhs->getType());
-    AllocaInst* alloca = create_entry_block_alloca(function, type, d.var_name());
-    builder.CreateStore(rhs, alloca);
-    named_values.value_from_current_scope(d.var_name()) = alloca;
+    Type* type = type_check(d.type(), rhs->getType());
+
+    if (auto var = dynamic_cast<Variable*>(d.lvalue())) {
+        AllocaInst* alloca = create_entry_block_alloca(function, type, var->name());
+        builder.CreateStore(rhs, alloca);
+        named_values.value_from_current_scope(var->name()) = alloca;
+    }
+    else {
+        throw InvalidExpressionError{};
+    }
+
     return rhs;
 }
 
@@ -688,7 +695,7 @@ Type* Codegen::common_type(const std::vector<Value*>& values)
     return common;
 }
 
-std::vector<Value*> Codegen::convert_numeric_to_float(std::vector<Value*>&& values)
+std::vector<Value*> Codegen::convert_numeric_to_float(std::vector<Value*> values)
 {
     for (Value*& value : values) {
         value = builder.CreateSIToFP(

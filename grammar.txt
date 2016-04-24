@@ -10,7 +10,9 @@ block ::= '{' exprs? '}'
 
 exprs ::= expr (';' exprs)*
 
-assign ::= cond ('=' cond)*
+assign ::=
+      lvalue ('=' assign)?
+    | cond
 
 cond ::= addsub (('<'|'>'|'=='|'!='|'<='|'>=') addsub)*
 
@@ -19,11 +21,10 @@ addsub ::= muldiv (('+'|'-') muldiv)*
 muldiv ::= primary (('*'|'/') primary)*
 
 primary ::=
-      def
+    def
     | if_else
     | while
     | fcall
-    | <id>
     | <integer>
     | <float_number>
     | 'true'
@@ -32,8 +33,11 @@ primary ::=
     | '-' primary
     | '!' primary
     | '(' expr ')'
+    | lvalue
 
-def ::= 'let' <id> (':' <id>)? '=' expr
+lvalue ::= <id>
+
+def ::= 'let' lvalue (':' <id>)? '=' expr
 
 if_else ::= 'if' expr block ('else' else_tail)?
 

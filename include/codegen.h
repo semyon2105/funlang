@@ -94,7 +94,7 @@ private:
 
     llvm::Type* common_type(const std::vector<llvm::Value*>&);
 
-    std::vector<llvm::Value*> convert_numeric_to_float(std::vector<llvm::Value*>&&);
+    std::vector<llvm::Value*> convert_numeric_to_float(std::vector<llvm::Value*>);
 
     llvm::AllocaInst* create_entry_block_alloca(llvm::Function*, llvm::Type*,
                                                 const std::string&);

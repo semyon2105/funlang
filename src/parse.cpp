@@ -3,20 +3,26 @@
 #include <stack>
 
 #include "parse.h"
+#include "util.h"
 
 using namespace Funlang;
 using namespace Funlang::AST;
 
-ParseError::ParseError(Token* at, size_t lineno)
+ParseError::ParseError(Token at, size_t lineno)
     : at{at}, lineno{lineno}
 {
 }
 
 UnexpectedTokenError::UnexpectedTokenError(
         Token::Kind expected,
-        Token* at,
+        Token at,
         size_t lineno)
     : ParseError{at, lineno}, expected{expected}
+{
+}
+
+LValueExpected::LValueExpected(Token at, size_t lineno)
+    : ParseError{at, lineno}
 {
 }
 
@@ -42,10 +48,10 @@ Token* Parser::lookahead(size_t offset)
 std::unique_ptr<Token> Parser::consume(Token::Kind expected_kind = (Token::Kind)0)
 {
     if (!current_token) {
-        throw ParseError{nullptr, lexer.line()};
+        throw ParseError{Token{'\0'}, lexer.line()};
     }
     if (expected_kind != 0 && expected_kind != current_token->kind) {
-        throw UnexpectedTokenError{expected_kind, current_token,
+        throw UnexpectedTokenError{expected_kind, *current_token,
                          lexer.line()};
     }
     auto consumed_token = std::move(*std::begin(lookahead_buffer));
@@ -128,8 +134,16 @@ std::unique_ptr<Definition> Parser::definition()
     }
     consume();
 
-    auto var_id_token = consume(Token::ID);
-    Id* var_id = dynamic_cast<Id*>(var_id_token.get());
+    Token primary_first_token = *current_token;
+    std::unique_ptr<LValue> lvalue;
+    auto maybe_lvalue = primary();
+    if (auto lval = dynamic_cast<LValue*>(maybe_lvalue.get())) {
+        maybe_lvalue.release();
+        lvalue.reset(lval);
+    }
+    else {
+        throw LValueExpected{primary_first_token, lexer.line()};
+    }
 
     Id* type_id = nullptr;
     if (current_token->kind == ':') {
@@ -140,12 +154,12 @@ std::unique_ptr<Definition> Parser::definition()
 
     consume('=');
 
-    auto expr = expression();
+    auto rhs = expression();
 
     return std::make_unique<Definition>(
-            var_id->name,
+            std::move(lvalue),
             type_id ? type_id->name : "",
-            std::move(expr)
+            std::move(rhs)
     );
 }
 
@@ -157,11 +171,6 @@ std::unique_ptr<Expression> Parser::primary()
         (pr = while_expr()) ||
         (pr = function_call())) {
         return pr;
-    }
-    if (current_token->kind == Token::ID) {
-        auto id_token = consume();
-        Id* id = dynamic_cast<Id*>(id_token.get());
-        return std::make_unique<Variable>(id->name);
     }
     if (current_token->kind == Token::INT) {
         auto integer_token = consume();
@@ -199,6 +208,11 @@ std::unique_ptr<Expression> Parser::primary()
         auto expr = expression();
         consume(')');
         return expr;
+    }
+    if (current_token->kind == Token::ID) {
+        auto id_token = consume();
+        Id* id = dynamic_cast<Id*>(id_token.get());
+        return std::make_unique<Variable>(id->name);
     }
     return nullptr;
 }
@@ -279,13 +293,14 @@ std::vector<std::unique_ptr<Expression>> Parser::optargs()
 std::unique_ptr<Expression> Parser::assignment()
 {
     auto lhs = conditional();
-    if (current_token->kind == '=') {
+    if (auto lvalue = dynamic_cast<LValue*>(lhs.get())
+        && current_token->kind == '=')
+    {
         auto op_token = consume();
         auto kind = BinaryOperation::from_token_kind(op_token->kind);
         auto rhs = assignment();
         return std::make_unique<BinaryOperation>(
-                    std::move(lhs), kind, std::move(rhs)
-        );
+                    std::move(lhs), kind, std::move(rhs));
     }
     return lhs;
 }
@@ -384,7 +399,7 @@ std::unique_ptr<Function> Parser::function()
 
     if (current_token->kind != Token::FUNCTION) {
         throw UnexpectedTokenError{
-                Token::FUNCTION, current_token, lexer.line()
+                Token::FUNCTION, *current_token, lexer.line()
         };
     }
 

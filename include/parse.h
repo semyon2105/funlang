@@ -11,17 +11,22 @@ namespace Funlang
 
 struct ParseError
 {
-    ParseError(Token* at, size_t lineno);
+    ParseError(Token at, size_t lineno);
 
-    const Token* at;
+    const Token at;
     size_t lineno;
 };
 
 struct UnexpectedTokenError : ParseError
 {
-    UnexpectedTokenError(Token::Kind expected, Token* at, size_t lineno);
+    UnexpectedTokenError(Token::Kind expected, Token at, size_t lineno);
 
     const Token::Kind expected;
+};
+
+struct LValueExpected : ParseError
+{
+    LValueExpected(Token at, size_t lineno);
 };
 
 class Parser
@@ -67,6 +72,9 @@ private:
 
                         auto assignment()
                             -> std::unique_ptr<AST::Expression>;
+
+                            auto lvalue_from_primary()
+                                -> std::unique_ptr<AST::LValue>;
 
                             auto conditional()
                                 -> std::unique_ptr<AST::Expression>;

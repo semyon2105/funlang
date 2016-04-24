@@ -89,10 +89,11 @@ void PrinterVisitor::accept(Definition& d)
 {
     print(std::string{type_name(d)});
     auto level_guard = LevelGuard{level};
-    print(std::string{"name="} + d.var_name() +
-          ", static_type=" + d.var_type());
-    print("[Definition_RHS]");
-    d.expression()->accept(*this);
+    print("static_type=" + d.type());
+    print("[LValue]");
+    d.lvalue()->accept(*this);
+    print("[RValue]");
+    d.rhs()->accept(*this);
 }
 
 void PrinterVisitor::accept(BinaryOperation& b)

@@ -72,26 +72,26 @@ const std::vector<std::unique_ptr<Expression>>& Block::expressions() const
 }
 
 Definition::Definition(
-        std::string var_name,
-        std::string var_type,
-        std::unique_ptr<Expression> expr)
-    : var_name_{std::move(var_name)}, var_type_{std::move(var_type)}, expr{std::move(expr)}
+        std::unique_ptr<LValue> lvalue,
+        std::string type,
+        std::unique_ptr<Expression> rhs)
+    : lvalue_{std::move(lvalue)}, type_{std::move(type)}, rhs_{std::move(rhs)}
 {
 }
 
-const std::string& Definition::var_name() const
+LValue* Definition::lvalue() const
 {
-    return var_name_;
+    return lvalue_.get();
 }
 
-const std::string& Definition::var_type() const
+const std::string& Definition::type() const
 {
-    return var_type_;
+    return type_;
 }
 
-Expression* Definition::expression() const
+Expression* Definition::rhs() const
 {
-    return expr.get();
+    return rhs_.get();
 }
 
 BinaryOperation::BinaryOperation(
