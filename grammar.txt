@@ -1,14 +1,16 @@
 program ::= function+
 
-function ::= 'function' <id> '(' params? ')' ':' <id> block
+function ::= 'function' <id> '(' params? ')' ':' typeid block
 
-params ::= <id> ':' <id> (',' params)*
+params ::= <id> ':' typeid (',' params)*
 
 expr ::= block | assign
 
 block ::= '{' exprs? '}'
 
 exprs ::= expr (';' exprs)*
+
+typeid ::= <id> | <id> '[' ']'
 
 assign ::=
       lvalue ('=' assign)?
@@ -21,23 +23,17 @@ addsub ::= muldiv (('+'|'-') muldiv)*
 muldiv ::= primary (('*'|'/') primary)*
 
 primary ::=
-    def
+      '-' primary
+    | '!' primary
+    | '(' expr ')'
+    | def
     | if_else
     | while
     | fcall
-    | <integer>
-    | <float_number>
-    | 'true'
-    | 'false'
-    | 'null'
-    | '-' primary
-    | '!' primary
-    | '(' expr ')'
+    | literal
     | lvalue
 
-lvalue ::= <id>
-
-def ::= 'let' lvalue (':' <id>)? '=' expr
+def ::= 'let' <id> (':' typeid)? '=' expr
 
 if_else ::= 'if' expr block ('else' else_tail)?
 
@@ -50,3 +46,13 @@ while ::= 'while' expr block
 fcall ::= <id> '(' args? ')'
 
 args ::= expr (',' expr)*
+
+literal ::=
+      <integer>
+    | <float_number>
+    | 'true'
+    | 'false'
+    | 'null'
+    | '[' literal (',' literal)* ']'
+
+lvalue ::= <id> '[' expr ']' | <id>

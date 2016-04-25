@@ -124,11 +124,14 @@ void Codegen::add_utility_functions()
     scanf_func->setCallingConv(CallingConv::C);
 
     std::vector<std::unique_ptr<Parameter>> params;
-    params.emplace_back(std::make_unique<Parameter>("value", "float"));
+    params.emplace_back(std::make_unique<Parameter>(
+                            "value",
+                            std::make_unique<TypeId>(
+                                "float", TypeId::Kind::Single)));
     AST::Function print_float_prototype {
         "print",
         std::move(params),
-        "void",
+        std::make_unique<TypeId>("void", TypeId::Kind::Single),
         nullptr
     };
     generateFunction(print_float_prototype, [&]() {
@@ -139,7 +142,8 @@ void Codegen::add_utility_functions()
                     module, ArrayType::get(
                         IntegerType::get(context, 8), format.length() + 1
                     ),
-                    true, GlobalValue::PrivateLinkage, format_cstr, "printf_format");
+                    true, GlobalValue::PrivateLinkage,
+                    format_cstr, "printf_format");
         Constant* zero =
                 Constant::getNullValue(IntegerType::getInt32Ty(context));
         Value* format_ref = builder.CreateInBoundsGEP(gv, {zero, zero});
@@ -156,7 +160,7 @@ void Codegen::add_utility_functions()
     AST::Function input_float_prototype {
         "input",
         {},
-        "float",
+        std::make_unique<TypeId>("float", TypeId::Kind::Single),
         nullptr
     };
     generateFunction(input_float_prototype, [&]() {
@@ -195,8 +199,8 @@ Value* Codegen::generate(Program& p)
     // add print, input
     add_utility_functions();
 
-    for (const auto& func : p.functions()) {
-        if (func->name() == "main") {
+    for (const auto& func : p.functions) {
+        if (func->name == "main") {
             entrypoint = generate(*func);
         }
         else {
@@ -212,24 +216,24 @@ Value* Codegen::generate(Program& p)
 Value* Codegen::generate(AST::Function& f)
 {
     return generateFunction(f, [this, &f]() {
-        return generate(*f.body());
+        return generate(*f.body);
     });
 }
 
 Value* Codegen::generateFunction(AST::Function& f, std::function<Value*()> body_gen)
 {
-    if (module.getFunction(f.name())) {
+    if (module.getFunction(f.name)) {
         throw FunctionAlreadyDefinedError{};
     }
 
     std::vector<Type*> param_types;
-    std::transform(std::cbegin(f.parameters()), std::cend(f.parameters()),
+    std::transform(std::cbegin(f.params), std::cend(f.params),
                    std::back_inserter(param_types),
                    [this](const auto& param) {
-        return get_builtin_type(param->type_name());
+        return get_builtin_type(*param->type);
     });
 
-    Type* static_return_type = get_builtin_type(f.return_type());
+    Type* static_return_type = get_builtin_type(*f.return_type);
     FunctionType* func_type =
             FunctionType::get(
                 static_return_type,
@@ -238,11 +242,11 @@ Value* Codegen::generateFunction(AST::Function& f, std::function<Value*()> body_
             llvm::Function::Create(
                 func_type,
                 llvm::Function::ExternalLinkage,
-                f.name(), &module);
+                f.name, &module);
 
     size_t pos = 0;
     for (auto& arg : func->args()) {
-        arg.setName(f.parameters()[pos++]->name());
+        arg.setName(f.params[pos++]->name);
     }
 
     BasicBlock* bb = BasicBlock::Create(context, "entry", func);
@@ -261,7 +265,7 @@ Value* Codegen::generateFunction(AST::Function& f, std::function<Value*()> body_
 
         Value* return_value = rvalue(body_gen());
         if (return_value) {
-            Type* type = type_check(f.return_type(), return_value->getType());
+            Type* type = type_check(*f.return_type, return_value->getType());
             if (type->isVoidTy()) {
                 builder.CreateRetVoid();
             }
@@ -270,7 +274,7 @@ Value* Codegen::generateFunction(AST::Function& f, std::function<Value*()> body_
             }
         }
         else {
-            type_check(f.return_type(), Type::getVoidTy(context));
+            type_check(*f.return_type, Type::getVoidTy(context));
             builder.CreateRetVoid();
         }
     }
@@ -288,43 +292,43 @@ Value* Codegen::generate(Block& b)
     auto scope_guard = named_values.make_inner_scope();
 
     Value* expr_value = nullptr;
-    for (const auto& expr : b.expressions()) {
+    for (const auto& expr : b.exprs) {
         expr_value = generate(*expr);
     }
     return expr_value;
+}
+
+Value* Codegen::generate(TypeId& t)
+{
+    throw UnreachableCodeError{};
 }
 
 Value* Codegen::generate(Definition& d)
 {
     llvm::Function* function = builder.GetInsertBlock()->getParent();
 
-    Value* rhs = rvalue(generate(*d.rhs()));
+    Value* rhs = rvalue(generate(*d.rhs));
     if (!rhs) {
         throw UnexpectedBlankExpressionError{};
     }
-    Type* type = type_check(d.type(), rhs->getType());
+    Type* type = type_check(*d.type, rhs->getType());
 
-    if (auto var = dynamic_cast<Variable*>(d.lvalue())) {
-        AllocaInst* alloca = create_entry_block_alloca(function, type, var->name());
-        builder.CreateStore(rhs, alloca);
-        named_values.value_from_current_scope(var->name()) = alloca;
-    }
-    else {
-        throw InvalidExpressionError{};
-    }
+    AllocaInst* alloca = create_entry_block_alloca(function, type, d.name);
+    builder.CreateStore(rhs, alloca);
+    named_values.value_from_current_scope(d.name) = alloca;
 
     return rhs;
 }
 
 Value* Codegen::generate(BinaryOperation& b)
 {
-    Value* lhs = generate(*b.lhs());
-    Value* rhs = generate(*b.rhs());
+    Value* lhs = generate(*b.lhs);
+    Value* rhs = generate(*b.rhs);
     if (!lhs || !rhs) {
         throw UnexpectedBlankExpressionError{};
     }
 
-    Value* binop = match_binop(b.kind(), lhs, rhs);
+    Value* binop = match_binop(b.kind, lhs, rhs);
     if (!binop) {
         throw InvalidExpressionError{};
     }
@@ -333,14 +337,14 @@ Value* Codegen::generate(BinaryOperation& b)
 
 Value* Codegen::generate(UnaryOperation& u)
 {
-    Value* expr = rvalue(generate(*u.expression()));
+    Value* expr = rvalue(generate(*u.expr));
     if (!expr) {
         throw UnexpectedBlankExpressionError{};
     }
-    if (u.kind() == UnaryOperation::Kind::Minus) {
+    if (u.kind == UnaryOperation::Kind::Minus) {
         expr = builder.CreateNeg(expr, "negtmp", false, false);
     }
-    else if (u.kind() == UnaryOperation::Kind::Not) {
+    else if (u.kind == UnaryOperation::Kind::Not) {
         expr = builder.CreateNot(expr, "nottmp");
     }
     else {
@@ -353,7 +357,7 @@ Value* Codegen::generate(IfElseExpr& i)
 {
     llvm::Function* func = builder.GetInsertBlock()->getParent();
 
-    Value* cond = rvalue(generate(*i.condition()));
+    Value* cond = rvalue(generate(*i.condition));
 
     if (!cond->getType()->isIntegerTy(1)) {
         throw TypeError{};
@@ -366,16 +370,16 @@ Value* Codegen::generate(IfElseExpr& i)
     builder.CreateCondBr(cond, if_body_bb, else_body_bb);
 
     builder.SetInsertPoint(if_body_bb);
-    Value* if_br = generate(*i.if_body());
+    Value* if_br = generate(*i.if_body);
     builder.CreateBr(after_ifelse_bb);
     if_body_bb = builder.GetInsertBlock();
 
     builder.SetInsertPoint(else_body_bb);
 
     Value* else_br = nullptr;
-    if (i.else_body()) {
+    if (i.else_body) {
         func->getBasicBlockList().push_back(else_body_bb);
-        else_br = generate(*i.else_body());
+        else_br = generate(*i.else_body);
         builder.CreateBr(after_ifelse_bb);
         else_body_bb = builder.GetInsertBlock();
     }
@@ -414,7 +418,7 @@ Value* Codegen::generate(WhileExpr& w)
     builder.CreateBr(header_bb);
 
     builder.SetInsertPoint(header_bb);
-    Value* condition = rvalue(generate(*w.condition()));
+    Value* condition = rvalue(generate(*w.condition));
     if (!condition) {
         throw CodegenError{};
     }
@@ -428,7 +432,7 @@ Value* Codegen::generate(WhileExpr& w)
 
     func->getBasicBlockList().push_back(loop_bb);
     builder.SetInsertPoint(loop_bb);
-    generate(*w.body());
+    generate(*w.body);
     builder.CreateBr(header_bb);
     loop_bb = builder.GetInsertBlock();
 
@@ -440,16 +444,16 @@ Value* Codegen::generate(WhileExpr& w)
 
 Value* Codegen::generate(FunctionCall& f)
 {
-    llvm::Function* callee = module.getFunction(f.function_name());
+    llvm::Function* callee = module.getFunction(f.callee_name);
     if (!callee) {
         throw UndefinedReferenceError{};
     }
-    if (callee->arg_size() != f.arguments().size()) {
+    if (callee->arg_size() != f.args.size()) {
         throw IncorrectNumberOfArgumentsError{};
     }
 
     std::vector<Value*> actual_args;
-    for (const auto& arg : f.arguments()) {
+    for (const auto& arg : f.args) {
         actual_args.push_back(rvalue(generate(*arg)));
         if (!actual_args.back()) {
             throw UnexpectedBlankExpressionError{};
@@ -461,7 +465,12 @@ Value* Codegen::generate(FunctionCall& f)
 
 Value* Codegen::generate(Variable& v)
 {
-    return named_values[v.name()];
+    return named_values[v.name];
+}
+
+Value* Codegen::generate(ArrayAccess& a)
+{
+
 }
 
 Value* Codegen::generate(BoolValue& v)
@@ -477,6 +486,12 @@ Value* Codegen::generate(IntValue& v)
 Value* Codegen::generate(FloatValue& v)
 {
     return ConstantFP::get(Type::getDoubleTy(context), v.value);
+}
+
+Value* Codegen::generate(ArrayLiteral& arr)
+{
+    // TODO
+    return nullptr;
 }
 
 Value* Codegen::generate(NullValue&)
@@ -651,30 +666,30 @@ AllocaInst* Codegen::create_entry_block_alloca(
     return tmp_builder.CreateAlloca(var_type, nullptr, var_name.c_str());
 }
 
-llvm::Type* Codegen::get_builtin_type(const std::string& type_name)
+llvm::Type* Codegen::get_builtin_type(const TypeId& type)
 {
-    if (type_name == "bool") {
+    // TODO: arrays
+    if (type.name == "bool") {
         return Type::getInt1Ty(context);
     }
-    if (type_name == "int") {
+    if (type.name == "int") {
         return Type::getInt32Ty(context);
     }
-    if (type_name == "float") {
+    if (type.name == "float") {
         return Type::getDoubleTy(context);
     }
-    if (type_name == "void") {
+    if (type.name == "void") {
         return Type::getVoidTy(context);
     }
     throw NoSuchTypeError{};
 }
 
-llvm::Type* Codegen::type_check(const std::string& type_name, Type* deducted)
+llvm::Type* Codegen::type_check(const TypeId& type, Type* deducted)
 {
-    if (type_name == "") {
+    if (type.name == "") {
         return deducted;
     }
-    Type* static_type = get_builtin_type(type_name);
-    deducted->dump();
+    Type* static_type = get_builtin_type(type);
     if (static_type != deducted) {
         throw TypeMismatchError{};
     }
@@ -707,21 +722,25 @@ std::vector<Value*> Codegen::convert_numeric_to_float(std::vector<Value*> values
 llvm::Value* Codegen::generate(Node& node)
 {
     node.accept(*this);
-    return __llvm_value;
+    return latest_llvm_value;
 }
-void Codegen::accept(Program& n)         { __llvm_value = generate(n); };
-void Codegen::accept(AST::Function& n)   { __llvm_value = generate(n); };
-void Codegen::accept(Parameter& n)       { __llvm_value = generate(n); };
-void Codegen::accept(Block& n)           { __llvm_value = generate(n); };
-void Codegen::accept(Definition& n)      { __llvm_value = generate(n); };
-void Codegen::accept(BinaryOperation& n) { __llvm_value = generate(n); };
-void Codegen::accept(UnaryOperation& n)  { __llvm_value = generate(n); };
-void Codegen::accept(IfElseExpr& n)      { __llvm_value = generate(n); };
-void Codegen::accept(WhileExpr& n)       { __llvm_value = generate(n); };
-void Codegen::accept(FunctionCall& n)    { __llvm_value = generate(n); };
-void Codegen::accept(Variable& n)        { __llvm_value = generate(n); };
-void Codegen::accept(BoolValue& n)       { __llvm_value = generate(n); };
-void Codegen::accept(IntValue& n)        { __llvm_value = generate(n); };
-void Codegen::accept(FloatValue& n)      { __llvm_value = generate(n); };
-void Codegen::accept(NullValue& n)       { __llvm_value = generate(n); };
-void Codegen::accept(BlankExpr& n)       { __llvm_value = generate(n); };
+
+void Codegen::accept(Program& n)         { latest_llvm_value = generate(n); }
+void Codegen::accept(AST::Function& n)   { latest_llvm_value = generate(n); }
+void Codegen::accept(Parameter& n)       { latest_llvm_value = generate(n); }
+void Codegen::accept(Block& n)           { latest_llvm_value = generate(n); }
+void Codegen::accept(TypeId& n)          { latest_llvm_value = generate(n); }
+void Codegen::accept(Definition& n)      { latest_llvm_value = generate(n); }
+void Codegen::accept(BinaryOperation& n) { latest_llvm_value = generate(n); }
+void Codegen::accept(UnaryOperation& n)  { latest_llvm_value = generate(n); }
+void Codegen::accept(IfElseExpr& n)      { latest_llvm_value = generate(n); }
+void Codegen::accept(WhileExpr& n)       { latest_llvm_value = generate(n); }
+void Codegen::accept(FunctionCall& n)    { latest_llvm_value = generate(n); }
+void Codegen::accept(Variable& n)        { latest_llvm_value = generate(n); }
+void Codegen::accept(ArrayAccess& n)     { latest_llvm_value = generate(n); }
+void Codegen::accept(BoolValue& n)       { latest_llvm_value = generate(n); }
+void Codegen::accept(IntValue& n)        { latest_llvm_value = generate(n); }
+void Codegen::accept(FloatValue& n)      { latest_llvm_value = generate(n); }
+void Codegen::accept(ArrayLiteral& n)    { latest_llvm_value = generate(n); }
+void Codegen::accept(NullValue& n)       { latest_llvm_value = generate(n); }
+void Codegen::accept(BlankExpr& n)       { latest_llvm_value = generate(n); }

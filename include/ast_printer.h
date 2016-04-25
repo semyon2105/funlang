@@ -24,6 +24,7 @@ public:
     void accept(Function&) override;
     void accept(Parameter&) override;
     void accept(Block&) override;
+    void accept(TypeId&) override;
     void accept(Definition&) override;
     void accept(BinaryOperation&) override;
     void accept(UnaryOperation&) override;
@@ -31,9 +32,11 @@ public:
     void accept(WhileExpr&) override;
     void accept(FunctionCall&) override;
     void accept(Variable&) override;
+    void accept(ArrayAccess&) override;
     void accept(BoolValue&) override;
     void accept(IntValue&) override;
     void accept(FloatValue&) override;
+    void accept(ArrayLiteral&) override;
     void accept(NullValue&) override;
     void accept(BlankExpr&) override;
 

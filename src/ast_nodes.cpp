@@ -6,59 +6,24 @@
 using namespace Funlang::AST;
 
 Program::Program(std::vector<std::unique_ptr<Function>> functions)
-    : functions_{std::move(functions)}
+    : functions{std::move(functions)}
 {
-}
-
-const std::vector<std::unique_ptr<Function>>& Program::functions() const
-{
-    return functions_;
 }
 
 Function::Function(std::string name,
                    std::vector<std::unique_ptr<Parameter>> params,
-                   std::string return_type,
+                   std::unique_ptr<TypeId> return_type,
                    std::unique_ptr<Expression> body)
-    : name_{std::move(name)},
-      params_{std::move(params)},
-      return_type_{std::move(return_type)},
-      body_{std::move(body)}
+    : name{std::move(name)},
+      params{std::move(params)},
+      return_type{std::move(return_type)},
+      body{std::move(body)}
 {
 }
 
-const std::string& Function::name() const
+Parameter::Parameter(std::string name, std::unique_ptr<TypeId> type)
+        : name{std::move(name)}, type{std::move(type)}
 {
-    return name_;
-}
-
-const std::vector<std::unique_ptr<Parameter>>& Function::parameters() const
-{
-    return params_;
-}
-
-const std::string& Function::return_type() const
-{
-    return return_type_;
-}
-
-Expression* Function::body() const
-{
-    return body_.get();
-}
-
-Parameter::Parameter(std::string name, std::string type_name)
-        : name_{std::move(name)}, type_name_{std::move(type_name)}
-{
-}
-
-const std::string& Parameter::name() const
-{
-    return name_;
-}
-
-const std::string& Parameter::type_name() const
-{
-    return type_name_;
 }
 
 Block::Block(std::vector<std::unique_ptr<Expression>> exprs)
@@ -66,55 +31,25 @@ Block::Block(std::vector<std::unique_ptr<Expression>> exprs)
 {
 }
 
-const std::vector<std::unique_ptr<Expression>>& Block::expressions() const
+TypeId::TypeId(std::string name, Kind kind)
+    : name{name}, kind{kind}
 {
-    return exprs;
 }
 
 Definition::Definition(
-        std::unique_ptr<LValue> lvalue,
-        std::string type,
+        std::string name,
+        std::unique_ptr<TypeId> type,
         std::unique_ptr<Expression> rhs)
-    : lvalue_{std::move(lvalue)}, type_{std::move(type)}, rhs_{std::move(rhs)}
+    : name{std::move(name)}, type{std::move(type)}, rhs{std::move(rhs)}
 {
-}
-
-LValue* Definition::lvalue() const
-{
-    return lvalue_.get();
-}
-
-const std::string& Definition::type() const
-{
-    return type_;
-}
-
-Expression* Definition::rhs() const
-{
-    return rhs_.get();
 }
 
 BinaryOperation::BinaryOperation(
         std::unique_ptr<Expression> lhs,
         Kind kind,
         std::unique_ptr<Expression> rhs)
-    : lhs_{std::move(lhs)}, kind_{kind}, rhs_{std::move(rhs)}
+    : lhs{std::move(lhs)}, kind{kind}, rhs{std::move(rhs)}
 {
-}
-
-Expression* BinaryOperation::lhs() const
-{
-    return lhs_.get();
-}
-
-BinaryOperation::Kind BinaryOperation::kind() const
-{
-    return kind_;
-}
-
-Expression* BinaryOperation::rhs() const
-{
-    return rhs_.get();
 }
 
 BinaryOperation::Kind BinaryOperation::from_token_kind(const Token::Kind& kind)
@@ -151,7 +86,7 @@ BinaryOperation::kind_strings {
 };
 
 UnaryOperation::UnaryOperation(Kind kind, std::unique_ptr<Expression> expr)
-        : kind_{kind}, expr{std::move(expr)}
+        : kind{kind}, expr{std::move(expr)}
 {
 }
 
@@ -161,84 +96,37 @@ UnaryOperation::kind_strings {
         { Kind::Not, "Not" }
 };
 
-UnaryOperation::Kind UnaryOperation::kind() const
-{
-    return kind_;
-}
-
-Expression* UnaryOperation::expression() const
-{
-    return expr.get();
-}
-
-
 IfElseExpr::IfElseExpr(
         std::unique_ptr<Expression> condition,
         std::unique_ptr<Expression> if_body,
         std::unique_ptr<Expression> else_body)
-    : cond{std::move(condition)},
-      if_body_{std::move(if_body)},
-      else_body_{std::move(else_body)}
+    : condition{std::move(condition)},
+      if_body{std::move(if_body)},
+      else_body{std::move(else_body)}
 {
-}
-
-Expression* IfElseExpr::condition() const
-{
-    return cond.get();
-}
-
-Expression* IfElseExpr::if_body() const
-{
-    return if_body_.get();
-}
-
-Expression* IfElseExpr::else_body() const
-{
-    return else_body_.get();
 }
 
 WhileExpr::WhileExpr(std::unique_ptr<Expression> condition,
                      std::unique_ptr<Expression> body)
-        : cond{std::move(condition)}, body_{std::move(body)}
+        : condition{std::move(condition)}, body{std::move(body)}
 {
-}
-
-Expression* WhileExpr::condition() const
-{
-    return cond.get();
-}
-
-Expression* WhileExpr::body() const
-{
-    return body_.get();
 }
 
 FunctionCall::FunctionCall(
         std::string func_name,
         std::vector<std::unique_ptr<Expression>> args)
-    : func_name{std::move(func_name)}, args{std::move(args)}
+    : callee_name{std::move(func_name)}, args{std::move(args)}
 {
-}
-
-const std::string& FunctionCall::function_name() const
-{
-    return func_name;
-}
-
-const std::vector<std::unique_ptr<Expression>>&
-FunctionCall::arguments() const
-{
-    return args;
 }
 
 Variable::Variable(std::string name)
-    : name_{std::move(name)}
+    : name{std::move(name)}
 {
 }
 
-const std::string& Variable::name() const
+ArrayAccess::ArrayAccess(std::string name, std::unique_ptr<Expression> index_expr)
+    : name{std::move(name)}, index_expr{std::move(index_expr)}
 {
-    return name_;
 }
 
 BoolValue::BoolValue(bool value)
@@ -256,7 +144,8 @@ FloatValue::FloatValue(double value)
 {
 }
 
-NullValue::NullValue()
+ArrayLiteral::ArrayLiteral(std::vector<std::unique_ptr<Literal>> elements)
+    : elements{std::move(elements)}
 {
 }
 
@@ -264,6 +153,7 @@ void Program::accept(Visitor& v) { v.accept(*this); }
 void Function::accept(Visitor& v) { v.accept(*this); }
 void Parameter::accept(Visitor& v) { v.accept(*this); }
 void Block::accept(Visitor& v) { v.accept(*this); }
+void TypeId::accept(Visitor& v) { v.accept(*this); }
 void Definition::accept(Visitor& v) { v.accept(*this); }
 void BinaryOperation::accept(Visitor& v) { v.accept(*this); }
 void UnaryOperation::accept(Visitor& v) { v.accept(*this); }
@@ -271,8 +161,10 @@ void IfElseExpr::accept(Visitor& v) { v.accept(*this); }
 void WhileExpr::accept(Visitor& v) { v.accept(*this); }
 void FunctionCall::accept(Visitor& v) { v.accept(*this); }
 void Variable::accept(Visitor& v) { v.accept(*this); }
+void ArrayAccess::accept(Visitor& v) { v.accept(*this); }
 void BoolValue::accept(Visitor& v) { v.accept(*this); }
 void IntValue::accept(Visitor& v) { v.accept(*this); }
 void FloatValue::accept(Visitor& v) { v.accept(*this); }
+void ArrayLiteral::accept(Visitor& v) { v.accept(*this); }
 void NullValue::accept(Visitor& v) { v.accept(*this); }
 void BlankExpr::accept(Visitor& v) { v.accept(*this); }

@@ -80,6 +80,13 @@ public:
         return tokens;
     }
 
+    char look_ahead()
+    {
+        strip_ws();
+        if (is.eof()) return '\0';
+        return is.peek();
+    }
+
     size_t line() const { return lineno; }
 
 private:
@@ -184,13 +191,6 @@ private:
     {
         lineno += line_offset;
         line_offset = 0;
-    }
-
-    char look_ahead()
-    {
-        strip_ws();
-        if (is.eof()) return '\0';
-        return is.peek();
     }
 
     char consume()

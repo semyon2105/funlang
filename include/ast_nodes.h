@@ -14,24 +14,27 @@ namespace Funlang
 namespace AST
 {
 
-class Program;
-class Parameter;
-class Function;
-class Expression;
-class Block;
-class Definition;
-class BinaryOperation;
-class UnaryOperation;
-class IfElseExpr;
-class WhileExpr;
-class FunctionCall;
-class LValue;
-class Variable;
-class BoolValue;
-class IntValue;
-class FloatValue;
-class NullValue;
-class BlankExpr;
+struct Program;
+struct Parameter;
+struct Function;
+struct Expression;
+struct Block;
+struct TypeId;
+struct Definition;
+struct BinaryOperation;
+struct UnaryOperation;
+struct IfElseExpr;
+struct WhileExpr;
+struct FunctionCall;
+struct LValue;
+struct Variable;
+struct ArrayAccess;
+struct BoolValue;
+struct IntValue;
+struct FloatValue;
+struct ArrayLiteral;
+struct NullValue;
+struct BlankExpr;
 
 struct Visitor
 {
@@ -39,6 +42,7 @@ struct Visitor
     virtual void accept(Function&) = 0;
     virtual void accept(Parameter&) = 0;
     virtual void accept(Block&) = 0;
+    virtual void accept(TypeId&) = 0;
     virtual void accept(Definition&) = 0;
     virtual void accept(BinaryOperation&) = 0;
     virtual void accept(UnaryOperation&) = 0;
@@ -46,9 +50,11 @@ struct Visitor
     virtual void accept(WhileExpr&) = 0;
     virtual void accept(FunctionCall&) = 0;
     virtual void accept(Variable&) = 0;
+    virtual void accept(ArrayAccess&) = 0;
     virtual void accept(BoolValue&) = 0;
     virtual void accept(IntValue&) = 0;
     virtual void accept(FloatValue&) = 0;
+    virtual void accept(ArrayLiteral&) = 0;
     virtual void accept(NullValue&) = 0;
     virtual void accept(BlankExpr&) = 0;
 };
@@ -58,96 +64,78 @@ struct Node
     virtual void accept(Visitor&) = 0;
 };
 
-class Program : public Node
+struct Program : Node
 {
-public:
     Program(std::vector<std::unique_ptr<Function>> functions);
 
-    const std::vector<std::unique_ptr<Function>>& functions() const;
+    const std::vector<std::unique_ptr<Function>> functions;
 
     void accept(Visitor&) override;
-
-private:
-    const std::vector<std::unique_ptr<Function>> functions_;
 };
 
-class Function : public Node
+struct Function : Node
 {
-public:
     Function(std::string name,
              std::vector<std::unique_ptr<Parameter>> params,
-             std::string return_type,
+             std::unique_ptr<TypeId> return_type,
              std::unique_ptr<Expression> body);
 
-    const std::string& name() const;
-    const std::vector<std::unique_ptr<Parameter>>& parameters() const;
-    const std::string& return_type() const;
-    Expression* body() const;
+    const std::string name;
+    const std::vector<std::unique_ptr<Parameter>> params;
+    const std::unique_ptr<TypeId> return_type;
+    const std::unique_ptr<Expression> body;
 
     void accept(Visitor&) override;
-
-private:
-    const std::string name_;
-    const std::vector<std::unique_ptr<Parameter>> params_;
-    const std::string return_type_;
-    const std::unique_ptr<Expression> body_;
 };
 
-class Parameter : public Node
+struct Parameter : Node
 {
-public:
-    Parameter(std::string name, std::string type_name);
+    Parameter(std::string name, std::unique_ptr<TypeId> type);
 
-    const std::string& name() const;
-    const std::string& type_name() const;
+    const std::string name;
+    const std::unique_ptr<TypeId> type;
 
     void accept(Visitor&) override;
-
-private:
-    const std::string name_;
-    const std::string type_name_;
 };
 
-struct Expression : public Node
+struct Expression : Node {};
+
+struct Block : Expression
 {
-    virtual ~Expression() {}
-};
+    Block(std::vector<std::unique_ptr<Expression>> expressions);
 
-class Block : public Expression
-{
-public:
-    Block(std::vector<std::unique_ptr<Expression>> exprs);
-
-    const std::vector<std::unique_ptr<Expression>>& expressions() const;
-
-    void accept(Visitor&) override;
-
-private:
     const std::vector<std::unique_ptr<Expression>> exprs;
+
+    void accept(Visitor&) override;
 };
 
-class Definition : public Expression
+struct TypeId : Node
 {
-public:
-    Definition(std::unique_ptr<LValue> lvalue,
-               std::string type,
+    enum class Kind { Single, Array };
+
+    TypeId(std::string name, Kind kind);
+
+    const std::string name;
+    const Kind kind;
+
+    void accept(Visitor&) override;
+};
+
+struct Definition : Expression
+{
+    Definition(std::string name,
+               std::unique_ptr<TypeId> type,
                std::unique_ptr<Expression> rhs);
 
-    LValue* lvalue() const;
-    const std::string& type() const;
-    Expression* rhs() const;
+    const std::string name;
+    const std::unique_ptr<TypeId> type;
+    const std::unique_ptr<Expression> rhs;
 
     void accept(Visitor&) override;
-
-private:
-    const std::unique_ptr<LValue> lvalue_;
-    const std::string type_;
-    const std::unique_ptr<Expression> rhs_;
 };
 
-class BinaryOperation : public Expression
+struct BinaryOperation : Expression
 {
-public:
     enum class Kind
     {
         Assign,
@@ -170,42 +158,28 @@ public:
                     Kind kind,
                     std::unique_ptr<Expression> rhs);
 
-    Expression* lhs() const;
-    Kind kind() const;
-    Expression* rhs() const;
+    const std::unique_ptr<Expression> lhs;
+    const Kind kind;
+    const std::unique_ptr<Expression> rhs;
 
     void accept(Visitor&) override;
-
-private:
-    const std::unique_ptr<Expression> lhs_;
-    const Kind kind_;
-    const std::unique_ptr<Expression> rhs_;
 };
 
-class UnaryOperation : public Expression
+struct UnaryOperation : Expression
 {
-public:
-    enum class Kind
-    {
-        Not,
-        Minus
-    };
+    enum class Kind { Not, Minus };
 
     static const std::map<Kind, const std::string> kind_strings;
 
     UnaryOperation(Kind kind, std::unique_ptr<Expression> expr);
 
-    Kind kind() const;
-    Expression* expression() const;
+    const Kind kind;
+    const std::unique_ptr<Expression> expr;
 
     void accept(Visitor&) override;
-
-private:
-    const Kind kind_;
-    const std::unique_ptr<Expression> expr;
 };
 
-class IfElseExpr : public Expression
+struct IfElseExpr : Expression
 {
 public:
     IfElseExpr(
@@ -213,70 +187,59 @@ public:
             std::unique_ptr<Expression> if_body,
             std::unique_ptr<Expression> else_body = nullptr);
 
-    Expression* condition() const;
-    Expression* if_body() const;
-    Expression* else_body() const;
+    const std::unique_ptr<Expression> condition;
+    const std::unique_ptr<Expression> if_body;
+    const std::unique_ptr<Expression> else_body;
 
     void accept(Visitor&) override;
-
-private:
-    const std::unique_ptr<Expression> cond;
-    const std::unique_ptr<Expression> if_body_;
-    const std::unique_ptr<Expression> else_body_;
 };
 
-class WhileExpr : public Expression
+struct WhileExpr : Expression
 {
-public:
     WhileExpr(std::unique_ptr<Expression> condition,
               std::unique_ptr<Expression> body);
 
-    Expression* condition() const;
-    Expression* body() const;
+    const std::unique_ptr<Expression> condition;
+    const std::unique_ptr<Expression> body;
 
     void accept(Visitor&) override;
-
-private:
-    const std::unique_ptr<Expression> cond;
-    const std::unique_ptr<Expression> body_;
 };
 
-class FunctionCall : public Expression
+struct FunctionCall : Expression
 {
-public:
     FunctionCall(std::string func_name,
                  std::vector<std::unique_ptr<Expression>> args);
 
-    const std::string& function_name() const;
-    const std::vector<std::unique_ptr<Expression>>& arguments() const;
-
-    void accept(Visitor&) override;
-
-private:
-    const std::string func_name;
+    const std::string callee_name;
     const std::vector<std::unique_ptr<Expression>> args;
 
+    void accept(Visitor&) override;
 };
 
-struct LValue : public Expression
-{
-    virtual ~LValue() {}
-};
+struct LValue : Expression {};
 
-class Variable : public LValue
+struct Variable : LValue
 {
-public:
     Variable(std::string name);
 
-    const std::string& name() const;
+    const std::string name;
 
     void accept(Visitor&) override;
-
-private:
-    const std::string name_;
 };
 
-struct BoolValue : Expression
+struct ArrayAccess : LValue
+{
+    ArrayAccess(std::string name, std::unique_ptr<Expression> index_expr);
+
+    const std::string name;
+    const std::unique_ptr<Expression> index_expr;
+
+    void accept(Visitor&) override;
+};
+
+struct Literal : Expression {};
+
+struct BoolValue : Literal
 {
     BoolValue(bool value);
 
@@ -285,7 +248,7 @@ struct BoolValue : Expression
     void accept(Visitor&) override;
 };
 
-struct IntValue : Expression
+struct IntValue : Literal
 {
     IntValue(int value);
 
@@ -294,7 +257,7 @@ struct IntValue : Expression
     void accept(Visitor&) override;
 };
 
-struct FloatValue : Expression
+struct FloatValue : Literal
 {
     FloatValue(double value);
 
@@ -303,10 +266,17 @@ struct FloatValue : Expression
     void accept(Visitor&) override;
 };
 
-struct NullValue : Expression
+struct ArrayLiteral : Literal
 {
-    NullValue();
+    ArrayLiteral(std::vector<std::unique_ptr<Literal>> elements);
 
+    const std::vector<std::unique_ptr<Literal>> elements;
+
+    void accept(Visitor&) override;
+};
+
+struct NullValue : Literal
+{
     void accept(Visitor&) override;
 };
 

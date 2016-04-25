@@ -36,10 +36,11 @@ public:
 
     std::unique_ptr<AST::Program> parse_all();
 
-private:
+private:    
     Lexer& lexer;
     boost::circular_buffer<std::unique_ptr<Token>> lookahead_buffer;
     Token* current_token;
+    std::unique_ptr<Token> eof_token = nullptr;
 
     Token* lookahead(size_t offset);
 
@@ -64,6 +65,9 @@ private:
             auto block()
                 -> std::unique_ptr<AST::Block>;
 
+            auto type_id()
+                -> std::unique_ptr<AST::TypeId>;
+
                 auto optexprs()
                     -> std::vector<std::unique_ptr<AST::Expression>>;
 
@@ -72,9 +76,6 @@ private:
 
                         auto assignment()
                             -> std::unique_ptr<AST::Expression>;
-
-                            auto lvalue_from_primary()
-                                -> std::unique_ptr<AST::LValue>;
 
                             auto conditional()
                                 -> std::unique_ptr<AST::Expression>;
@@ -105,6 +106,17 @@ private:
 
                                                 auto optargs()
                                                     -> std::vector<std::unique_ptr<AST::Expression>>;
+
+                                            auto literal()
+                                                -> std::unique_ptr<AST::Literal>;
+
+                                                auto array_literal()
+                                                    -> std::unique_ptr<AST::ArrayLiteral>;
+
+                                            auto lvalue()
+                                                -> std::unique_ptr<AST::LValue>;
+
+
 };
 
 }

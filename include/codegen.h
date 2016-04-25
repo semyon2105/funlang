@@ -62,6 +62,7 @@ private:
 
     llvm::Value* generate(Parameter&);
     llvm::Value* generate(Block&);
+    llvm::Value* generate(TypeId&);
     llvm::Value* generate(Definition&);
     llvm::Value* generate(BinaryOperation&);
     llvm::Value* generate(UnaryOperation&);
@@ -69,9 +70,11 @@ private:
     llvm::Value* generate(WhileExpr&);
     llvm::Value* generate(FunctionCall&);
     llvm::Value* generate(Variable&);
+    llvm::Value* generate(ArrayAccess&);
     llvm::Value* generate(BoolValue&);
     llvm::Value* generate(IntValue&);
     llvm::Value* generate(FloatValue&);
+    llvm::Value* generate(ArrayLiteral&);
     llvm::Value* generate(NullValue&);
     llvm::Value* generate(BlankExpr&);
 
@@ -99,15 +102,14 @@ private:
     llvm::AllocaInst* create_entry_block_alloca(llvm::Function*, llvm::Type*,
                                                 const std::string&);
 
-    llvm::Type* get_builtin_type(const std::string&);
-    llvm::Type* type_check(const std::string&, llvm::Type*);
-
-    llvm::Value* __llvm_value;
+    llvm::Type* get_builtin_type(const TypeId&);
+    llvm::Type* type_check(const TypeId&, llvm::Type*);
 
     void accept(Program&) override;
     void accept(Function&) override;
     void accept(Parameter&) override;
     void accept(Block&) override;
+    void accept(TypeId&) override;
     void accept(Definition&) override;
     void accept(BinaryOperation&) override;
     void accept(UnaryOperation&) override;
@@ -115,11 +117,15 @@ private:
     void accept(WhileExpr&) override;
     void accept(FunctionCall&) override;
     void accept(Variable&) override;
+    void accept(ArrayAccess&) override;
     void accept(BoolValue&) override;
     void accept(IntValue&) override;
     void accept(FloatValue&) override;
+    void accept(ArrayLiteral&) override;
     void accept(NullValue&) override;
     void accept(BlankExpr&) override;
+
+    llvm::Value* latest_llvm_value = nullptr;
 };
 
 }
