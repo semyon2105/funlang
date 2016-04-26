@@ -19,20 +19,24 @@ struct Parameter;
 struct Function;
 struct Expression;
 struct Block;
-struct TypeId;
+struct StaticTypeId;
+struct PrimitiveTypeId;
+struct ArrayTypeId;
+struct EmptyTypeId;
 struct Definition;
 struct BinaryOperation;
 struct UnaryOperation;
 struct IfElseExpr;
 struct WhileExpr;
 struct FunctionCall;
+struct ArrayExpr;
 struct LValue;
 struct Variable;
 struct ArrayAccess;
+struct Literal;
 struct BoolValue;
 struct IntValue;
 struct FloatValue;
-struct ArrayLiteral;
 struct NullValue;
 struct BlankExpr;
 
@@ -42,19 +46,22 @@ struct Visitor
     virtual void accept(Function&) = 0;
     virtual void accept(Parameter&) = 0;
     virtual void accept(Block&) = 0;
-    virtual void accept(TypeId&) = 0;
+    virtual void accept(StaticTypeId&) = 0;
+    virtual void accept(PrimitiveTypeId&) = 0;
+    virtual void accept(ArrayTypeId&) = 0;
+    virtual void accept(EmptyTypeId&) = 0;
     virtual void accept(Definition&) = 0;
     virtual void accept(BinaryOperation&) = 0;
     virtual void accept(UnaryOperation&) = 0;
     virtual void accept(IfElseExpr&) = 0;
     virtual void accept(WhileExpr&) = 0;
     virtual void accept(FunctionCall&) = 0;
+    virtual void accept(ArrayExpr&) = 0;
     virtual void accept(Variable&) = 0;
     virtual void accept(ArrayAccess&) = 0;
     virtual void accept(BoolValue&) = 0;
     virtual void accept(IntValue&) = 0;
     virtual void accept(FloatValue&) = 0;
-    virtual void accept(ArrayLiteral&) = 0;
     virtual void accept(NullValue&) = 0;
     virtual void accept(BlankExpr&) = 0;
 };
@@ -77,12 +84,12 @@ struct Function : Node
 {
     Function(std::string name,
              std::vector<std::unique_ptr<Parameter>> params,
-             std::unique_ptr<TypeId> return_type,
+             std::unique_ptr<StaticTypeId> return_type,
              std::unique_ptr<Expression> body);
 
     const std::string name;
     const std::vector<std::unique_ptr<Parameter>> params;
-    const std::unique_ptr<TypeId> return_type;
+    const std::unique_ptr<StaticTypeId> return_type;
     const std::unique_ptr<Expression> body;
 
     void accept(Visitor&) override;
@@ -90,10 +97,10 @@ struct Function : Node
 
 struct Parameter : Node
 {
-    Parameter(std::string name, std::unique_ptr<TypeId> type);
+    Parameter(std::string name, std::unique_ptr<StaticTypeId> type);
 
     const std::string name;
-    const std::unique_ptr<TypeId> type;
+    const std::unique_ptr<StaticTypeId> type;
 
     void accept(Visitor&) override;
 };
@@ -109,14 +116,34 @@ struct Block : Expression
     void accept(Visitor&) override;
 };
 
-struct TypeId : Node
+struct StaticTypeId : Node
 {
-    enum class Kind { Single, Array };
-
-    TypeId(std::string name, Kind kind);
+    StaticTypeId(std::string name);
 
     const std::string name;
-    const Kind kind;
+
+    void accept(Visitor&) override;
+};
+
+struct PrimitiveTypeId : StaticTypeId
+{
+    PrimitiveTypeId(std::string name);
+
+    void accept(Visitor&) override;
+};
+
+struct ArrayTypeId : StaticTypeId
+{
+    ArrayTypeId(std::string name, std::vector<int> dim);
+
+    const std::vector<int> dim_sizes;
+
+    void accept(Visitor&) override;
+};
+
+struct EmptyTypeId : StaticTypeId
+{
+    EmptyTypeId();
 
     void accept(Visitor&) override;
 };
@@ -124,11 +151,11 @@ struct TypeId : Node
 struct Definition : Expression
 {
     Definition(std::string name,
-               std::unique_ptr<TypeId> type,
+               std::unique_ptr<StaticTypeId> type,
                std::unique_ptr<Expression> rhs);
 
     const std::string name;
-    const std::unique_ptr<TypeId> type;
+    const std::unique_ptr<StaticTypeId> type;
     const std::unique_ptr<Expression> rhs;
 
     void accept(Visitor&) override;
@@ -216,6 +243,16 @@ struct FunctionCall : Expression
     void accept(Visitor&) override;
 };
 
+
+struct ArrayExpr : Expression
+{
+    ArrayExpr(std::vector<std::unique_ptr<Expression>> elements);
+
+    const std::vector<std::unique_ptr<Expression>> elements;
+
+    void accept(Visitor&) override;
+};
+
 struct LValue : Expression {};
 
 struct Variable : LValue
@@ -229,15 +266,18 @@ struct Variable : LValue
 
 struct ArrayAccess : LValue
 {
-    ArrayAccess(std::string name, std::unique_ptr<Expression> index_expr);
+    ArrayAccess(std::string name,
+                std::vector<std::unique_ptr<Expression>> index_exprs);
 
     const std::string name;
-    const std::unique_ptr<Expression> index_expr;
+    const std::vector<std::unique_ptr<Expression>> index_exprs;
 
     void accept(Visitor&) override;
 };
 
-struct Literal : Expression {};
+struct Literal : Expression
+{
+};
 
 struct BoolValue : Literal
 {
@@ -262,15 +302,6 @@ struct FloatValue : Literal
     FloatValue(double value);
 
     const double value;
-
-    void accept(Visitor&) override;
-};
-
-struct ArrayLiteral : Literal
-{
-    ArrayLiteral(std::vector<std::unique_ptr<Literal>> elements);
-
-    const std::vector<std::unique_ptr<Literal>> elements;
 
     void accept(Visitor&) override;
 };

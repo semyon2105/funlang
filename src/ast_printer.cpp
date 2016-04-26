@@ -1,10 +1,10 @@
-#include <boost/core/demangle.hpp>
+﻿#include <boost/core/demangle.hpp>
 
 #include "ast_printer.h"
 
 using namespace Funlang;
 using namespace Funlang::AST;
-using namespace Funlang::AST::impl;
+using namespace Funlang::AST::Codegen;
 
 template <typename T>
 std::string type_name(const T& t)
@@ -89,22 +89,34 @@ void PrinterVisitor::accept(Block& b)
     }
 }
 
-void PrinterVisitor::accept(TypeId& t)
+void PrinterVisitor::accept(StaticTypeId& t)
 {
     print(std::string{type_name(t)});
     auto level_guard = LevelGuard{level};
-    std::string kind;
-    switch (t.kind) {
-    case TypeId::Kind::Single:
-        kind = "single";
-        break;
-    case TypeId::Kind::Array:
-        kind = "array";
-        break;
-    }
+    print("name=" + t.name);
+}
 
-    std::string type_name = t.name == "" ? "<Nothing>" : t.name;
-    print(std::string{"name="} + type_name + ", kind=" + kind);
+void PrinterVisitor::accept(PrimitiveTypeId& t)
+{
+    print(std::string{type_name(t)});
+    auto level_guard = LevelGuard{level};
+    print("name=" + t.name);
+}
+
+void PrinterVisitor::accept(ArrayTypeId& t)
+{
+    print(std::string{type_name(t)});
+    auto level_guard = LevelGuard{level};
+    std::string dim_sizes;
+    for (int size : t.dim_sizes) {
+        dim_sizes += "[" + std::to_string(size) + "]";
+    }
+    print("name=" + t.name + dim_sizes);
+}
+
+void PrinterVisitor::accept(EmptyTypeId& t)
+{
+    print(std::string{type_name(t)});
 }
 
 void PrinterVisitor::accept(Definition& d)
@@ -185,8 +197,10 @@ void PrinterVisitor::accept(ArrayAccess& a)
     print(std::string{type_name(a)});
     auto level_guard = LevelGuard{level};
     print("name=" + a.name);
-    print("[IndexExpression]");
-    a.index_expr->accept(*this);
+    print("[IndexExpressions]");
+    for (const auto& expr : a.index_exprs) {
+        expr->accept(*this);
+    }
 }
 
 void PrinterVisitor::accept(BoolValue& v)
@@ -210,38 +224,15 @@ void PrinterVisitor::accept(FloatValue& v)
     print("value=" + std::to_string(v.value));
 }
 
-std::string to_string(const ArrayLiteral& array_lit)
-{
-    std::string str {"["};
-    for (const auto& elem : array_lit.elements) {
-        Literal* elem_raw = elem.get();
-        if (auto boolean = dynamic_cast<BoolValue*>(elem_raw)) {
-            str += boolean ? "True" : "False";
-        }
-        else if (auto integer = dynamic_cast<IntValue*>(elem_raw)) {
-            str += std::to_string(integer->value);
-        }
-        else if (auto fp_num = dynamic_cast<FloatValue*>(elem_raw)) {
-            str += std::to_string(fp_num->value);
-        }
-        else if (auto null_lit = dynamic_cast<NullValue*>(elem_raw)) {
-            str += "null";
-        }
-        else if (auto arr_lit = dynamic_cast<ArrayLiteral*>(elem_raw)) {
-            str += to_string(*arr_lit);
-        }
-        str += ", ";
-    }
-    str.resize(str.size() - 2);
-    str += "]";
-    return str;
-}
-
-void PrinterVisitor::accept(ArrayLiteral& arr)
+void PrinterVisitor::accept(ArrayExpr& arr)
 {
     print(std::string{type_name(arr)});
     auto level_guard = LevelGuard{level};
-    print("elements=" + to_string(arr));
+    print("[Elements]");
+    for (const auto& elem : arr.elements) {
+        Expression* elem_raw = elem.get();
+        elem_raw->accept(*this);
+    }
 }
 
 void PrinterVisitor::accept(NullValue& v)

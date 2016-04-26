@@ -12,7 +12,7 @@ namespace AST
 void print(Node& tree);
 void print(std::ostream& os, Node& tree);
 
-namespace impl
+namespace Codegen
 {
 
 class PrinterVisitor : public Visitor
@@ -24,7 +24,10 @@ public:
     void accept(Function&) override;
     void accept(Parameter&) override;
     void accept(Block&) override;
-    void accept(TypeId&) override;
+    void accept(StaticTypeId&) override;
+    void accept(PrimitiveTypeId&) override;
+    void accept(ArrayTypeId&) override;
+    void accept(EmptyTypeId&) override;
     void accept(Definition&) override;
     void accept(BinaryOperation&) override;
     void accept(UnaryOperation&) override;
@@ -36,7 +39,7 @@ public:
     void accept(BoolValue&) override;
     void accept(IntValue&) override;
     void accept(FloatValue&) override;
-    void accept(ArrayLiteral&) override;
+    void accept(ArrayExpr&) override;
     void accept(NullValue&) override;
     void accept(BlankExpr&) override;
 

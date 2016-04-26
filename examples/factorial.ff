@@ -8,6 +8,6 @@ function factorial(n:float) : float
 
 function main() : void
 {
-    let n : float = input();
-    print(factorial(n));
+    let n : float = input_float();
+    print_float(factorial(n));
 }

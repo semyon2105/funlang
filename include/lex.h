@@ -24,11 +24,13 @@ public:
     {
         if (look_ahead() == '\0') return nullptr;
 
-        std::unique_ptr<Token> token = get_number();
-        if (token) return token;
+        if (auto token = get_number_or_sign()) {
+            return token;
+        }
 
-        token = get_id_or_keyword();
-        if (token) return token;
+        if (auto token = get_id_or_keyword()) {
+            return token;
+        }
 
         char ch = consume();
         if (ch == '=')
@@ -110,7 +112,7 @@ private:
             { "while", Token{Token::WHILE} }
     };
 
-    std::unique_ptr<Token> get_number()
+    std::unique_ptr<Token> get_number_or_sign()
     {
         std::string token_str;
         bool float_num = false;
@@ -148,9 +150,9 @@ private:
     std::unique_ptr<Token> get_id_or_keyword()
     {
         std::string token_str;
-        if (std::isalpha(look_ahead())) {
+        if (std::isalpha(look_ahead()) || look_ahead() == '_') {
             token_str += consume();
-            while (std::isalnum(look_ahead())) {
+            while (std::isalnum(look_ahead()) || look_ahead() == '_') {
                 // stop forming the name if whitespace was stripped
                 if (ws_stripped) {
                     break;

@@ -72,38 +72,23 @@ std::unique_ptr<Token> Parser::consume(char expected_kind)
 std::unique_ptr<LValue> Parser::lvalue()
 {
     Token::Kind token_after_id = lookahead(1)->kind;
-    if (current_token->kind == Token::ID
-            && token_after_id == '[') {
+    if (current_token->kind == Token::ID && token_after_id == '[') {
         auto id_token = consume(Token::ID);
-        consume('[');
         Id* id = dynamic_cast<Id*>(id_token.get());
-        auto index_expr = expression();
-        consume(']');
-        return std::make_unique<ArrayAccess>(id->name, std::move(index_expr));
+
+        std::vector<std::unique_ptr<Expression>> index_exprs;
+        while (current_token->kind == '[') {
+            consume('[');
+            index_exprs.emplace_back(expression());
+            consume(']');
+        }
+
+        return std::make_unique<ArrayAccess>(id->name, std::move(index_exprs));
     }
-    if (current_token->kind == Token::ID
-            && token_after_id != '(') {
+    if (current_token->kind == Token::ID) {
         auto id_token = consume(Token::ID);
         Id* id = dynamic_cast<Id*>(id_token.get());
         return std::make_unique<Variable>(id->name);
-    }
-    return nullptr;
-}
-
-std::unique_ptr<ArrayLiteral> Parser::array_literal()
-{
-    if (current_token->kind == '[') {
-        consume('[');
-        std::vector<std::unique_ptr<Literal>> elements;
-        while (auto lit = literal()) {
-            elements.emplace_back(std::move(lit));
-            if (current_token->kind != ',') {
-                break;
-            }
-            consume(',');
-        }
-        consume(']');
-        return std::make_unique<ArrayLiteral>(std::move(elements));
     }
     return nullptr;
 }
@@ -132,8 +117,23 @@ std::unique_ptr<Literal> Parser::literal()
         consume(Token::NULLVAL);
         return std::make_unique<NullValue>();
     }
-    if (auto arr_lit = array_literal()) {
-        return std::move(arr_lit);
+    return nullptr;
+}
+
+std::unique_ptr<ArrayExpr> Parser::array()
+{
+    if (current_token->kind == '[') {
+        consume('[');
+        std::vector<std::unique_ptr<Expression>> elements;
+        while (auto expr = expression()) {
+            elements.emplace_back(std::move(expr));
+            if (current_token->kind != ',') {
+                break;
+            }
+            consume(',');
+        }
+        consume(']');
+        return std::make_unique<ArrayExpr>(std::move(elements));
     }
     return nullptr;
 }
@@ -210,10 +210,10 @@ std::unique_ptr<Definition> Parser::definition()
     auto id_token = consume(Token::ID);
     Id* id = dynamic_cast<Id*>(id_token.get());
 
-    std::unique_ptr<TypeId> type = nullptr;
+    std::unique_ptr<StaticTypeId> type = nullptr;
     if (current_token->kind == ':') {
         consume(':');
-        type = type_id();
+        type = static_type();
     }
 
     consume('=');
@@ -222,8 +222,7 @@ std::unique_ptr<Definition> Parser::definition()
 
     return std::make_unique<Definition>(
             std::move(id->name),
-            type ? std::move(type)
-                 : std::make_unique<TypeId>("", TypeId::Kind::Single),
+            type ? std::move(type) : std::make_unique<EmptyTypeId>(),
             std::move(rhs)
     );
 }
@@ -251,6 +250,7 @@ std::unique_ptr<Expression> Parser::primary()
         (prim = if_else_expr()) ||
         (prim = while_expr()) ||
         (prim = function_call()) ||
+        (prim = array()) ||
         (prim = literal()) ||
         (prim = lvalue())) {
         return prim;
@@ -380,17 +380,24 @@ std::vector<std::unique_ptr<Expression>> Parser::optexprs()
     return exprs;
 }
 
-std::unique_ptr<TypeId> Parser::type_id()
+std::unique_ptr<StaticTypeId> Parser::static_type()
 {
     if (current_token->kind == Token::ID) {
         auto id_token = consume(Token::ID);
         Id* id = dynamic_cast<Id*>(id_token.get());
-        if (current_token->kind == '[') {
-            consume('[');
-            consume(']');
-            return std::make_unique<TypeId>(id->name, TypeId::Kind::Array);
+        if (current_token->kind != '[') {
+            return std::make_unique<PrimitiveTypeId>(id->name);
         }
-        return std::make_unique<TypeId>(id->name, TypeId::Kind::Single);
+
+        std::vector<int> dim_sizes;
+        while (current_token->kind == '[') {
+            consume('[');
+            auto integer_token = consume(Token::INT);
+            Int* integer = dynamic_cast<Int*>(integer_token.get());
+            consume(']');
+            dim_sizes.push_back(integer->value);
+        }
+        return std::make_unique<ArrayTypeId>(id->name, dim_sizes);
     }
     return nullptr;
 }
@@ -417,7 +424,7 @@ std::unique_ptr<Parameter> Parser::parameter(bool is_optional)
 
     consume(':');
 
-    auto type = type_id();
+    auto type = static_type();
 
     return std::make_unique<Parameter>(param_name, std::move(type));
 }
@@ -466,7 +473,7 @@ std::unique_ptr<Function> Parser::function()
     consume(')');
     consume(':');
 
-    auto type = type_id();
+    auto type = static_type();
 
     auto body = block();
 

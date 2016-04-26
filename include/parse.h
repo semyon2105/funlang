@@ -65,8 +65,8 @@ private:
             auto block()
                 -> std::unique_ptr<AST::Block>;
 
-            auto type_id()
-                -> std::unique_ptr<AST::TypeId>;
+            auto static_type()
+                -> std::unique_ptr<AST::StaticTypeId>;
 
                 auto optexprs()
                     -> std::vector<std::unique_ptr<AST::Expression>>;
@@ -107,11 +107,11 @@ private:
                                                 auto optargs()
                                                     -> std::vector<std::unique_ptr<AST::Expression>>;
 
+                                            auto array()
+                                                -> std::unique_ptr<AST::ArrayExpr>;
+
                                             auto literal()
                                                 -> std::unique_ptr<AST::Literal>;
-
-                                                auto array_literal()
-                                                    -> std::unique_ptr<AST::ArrayLiteral>;
 
                                             auto lvalue()
                                                 -> std::unique_ptr<AST::LValue>;

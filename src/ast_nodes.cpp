@@ -12,7 +12,7 @@ Program::Program(std::vector<std::unique_ptr<Function>> functions)
 
 Function::Function(std::string name,
                    std::vector<std::unique_ptr<Parameter>> params,
-                   std::unique_ptr<TypeId> return_type,
+                   std::unique_ptr<StaticTypeId> return_type,
                    std::unique_ptr<Expression> body)
     : name{std::move(name)},
       params{std::move(params)},
@@ -21,8 +21,8 @@ Function::Function(std::string name,
 {
 }
 
-Parameter::Parameter(std::string name, std::unique_ptr<TypeId> type)
-        : name{std::move(name)}, type{std::move(type)}
+Parameter::Parameter(std::string name, std::unique_ptr<StaticTypeId> type)
+    : name{std::move(name)}, type{std::move(type)}
 {
 }
 
@@ -31,14 +31,29 @@ Block::Block(std::vector<std::unique_ptr<Expression>> exprs)
 {
 }
 
-TypeId::TypeId(std::string name, Kind kind)
-    : name{name}, kind{kind}
+StaticTypeId::StaticTypeId(std::string name)
+    : name{std::move(name)}
+{
+}
+
+PrimitiveTypeId::PrimitiveTypeId(std::string name)
+    : StaticTypeId{std::move(name)}
+{
+}
+
+ArrayTypeId::ArrayTypeId(std::string name, std::vector<int> dim_sizes)
+    : StaticTypeId{std::move(name)}, dim_sizes{std::move(dim_sizes)}
+{
+}
+
+EmptyTypeId::EmptyTypeId()
+    : StaticTypeId{""}
 {
 }
 
 Definition::Definition(
         std::string name,
-        std::unique_ptr<TypeId> type,
+        std::unique_ptr<StaticTypeId> type,
         std::unique_ptr<Expression> rhs)
     : name{std::move(name)}, type{std::move(type)}, rhs{std::move(rhs)}
 {
@@ -119,13 +134,19 @@ FunctionCall::FunctionCall(
 {
 }
 
+ArrayExpr::ArrayExpr(std::vector<std::unique_ptr<Expression>> elements)
+    : elements{std::move(elements)}
+{
+}
+
 Variable::Variable(std::string name)
     : name{std::move(name)}
 {
 }
 
-ArrayAccess::ArrayAccess(std::string name, std::unique_ptr<Expression> index_expr)
-    : name{std::move(name)}, index_expr{std::move(index_expr)}
+ArrayAccess::ArrayAccess(std::string name,
+                         std::vector<std::unique_ptr<Expression>> index_exprs)
+    : name{std::move(name)}, index_exprs{std::move(index_exprs)}
 {
 }
 
@@ -144,16 +165,29 @@ FloatValue::FloatValue(double value)
 {
 }
 
-ArrayLiteral::ArrayLiteral(std::vector<std::unique_ptr<Literal>> elements)
-    : elements{std::move(elements)}
+/*ArrayTypeId deduce_array_typeid(ArrayExpr* array)
 {
-}
+    std::vector<int> dim_sizes;
+    ArrayExpr* last_literal = nullptr;
+    for (auto subarray = array; subarray != nullptr;
+         last_literal = subarray,
+         subarray = dynamic_cast<ArrayExpr*>(subarray->elements[0].get()))
+    {
+        dim_sizes.push_back(subarray->elements.size());
+    }
+    Literal* lit = last_literal->elements[0].get();
+    auto primitive = dynamic_cast<const PrimitiveTypeId&>(lit->deduced_type());
+    return { primitive.name(), std::move(dim_sizes) };
+}*/
 
 void Program::accept(Visitor& v) { v.accept(*this); }
 void Function::accept(Visitor& v) { v.accept(*this); }
 void Parameter::accept(Visitor& v) { v.accept(*this); }
 void Block::accept(Visitor& v) { v.accept(*this); }
-void TypeId::accept(Visitor& v) { v.accept(*this); }
+void StaticTypeId::accept(Visitor& v) { v.accept(*this); }
+void PrimitiveTypeId::accept(Visitor& v) { v.accept(*this); }
+void ArrayTypeId::accept(Visitor& v) { v.accept(*this); }
+void EmptyTypeId::accept(Visitor& v) { v.accept(*this); }
 void Definition::accept(Visitor& v) { v.accept(*this); }
 void BinaryOperation::accept(Visitor& v) { v.accept(*this); }
 void UnaryOperation::accept(Visitor& v) { v.accept(*this); }
@@ -165,6 +199,6 @@ void ArrayAccess::accept(Visitor& v) { v.accept(*this); }
 void BoolValue::accept(Visitor& v) { v.accept(*this); }
 void IntValue::accept(Visitor& v) { v.accept(*this); }
 void FloatValue::accept(Visitor& v) { v.accept(*this); }
-void ArrayLiteral::accept(Visitor& v) { v.accept(*this); }
+void ArrayExpr::accept(Visitor& v) { v.accept(*this); }
 void NullValue::accept(Visitor& v) { v.accept(*this); }
 void BlankExpr::accept(Visitor& v) { v.accept(*this); }

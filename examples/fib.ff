@@ -13,6 +13,6 @@ function fib(i:float) : float
 
 function main() : void
 {
-    let n : float = input();
-    print(fib(n))
+    let n : float = input_float();
+    print_float(fib(n))
 }

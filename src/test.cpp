@@ -49,5 +49,6 @@ int main(int argc, char* argv[])
     std::string code = Funlang::AST::codegen(*program);
     std::cout << code;
     std::ofstream ofs {"out.ll"};
+
     ofs << code;
 }

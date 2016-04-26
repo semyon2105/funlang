@@ -2,6 +2,7 @@
 #include <memory>
 
 #include <boost/core/demangle.hpp>
+#include <boost/range/adaptor/reversed.hpp>
 
 #include <llvm/IR/TypeBuilder.h>
 #include <llvm/IR/Verifier.h>
@@ -29,6 +30,8 @@ struct NoSuchTypeError                  : CodegenError {};
 struct InvalidBinaryOperationError      : CodegenError {};
 struct UnexpectedBlankExpressionError   : CodegenError {};
 struct MainFunctionNotDefined           : CodegenError {};
+struct NonPositiveDimSizeError          : CodegenError {};
+struct ZeroLengthArrayError           : CodegenError {};
 
 std::string AST::codegen(Program& program, LLVMContext& context)
 {
@@ -95,7 +98,7 @@ Codegen::Codegen(LLVMContext& context)
     : context{context},
       module{"module", context},
       builder{context},
-      named_values{}
+      variables{}
 {
 
 }
@@ -123,15 +126,22 @@ void Codegen::add_utility_functions()
                 "scanf", &module);
     scanf_func->setCallingConv(CallingConv::C);
 
-    std::vector<std::unique_ptr<Parameter>> params;
-    params.emplace_back(std::make_unique<Parameter>(
-                            "value",
-                            std::make_unique<TypeId>(
-                                "float", TypeId::Kind::Single)));
+    std::vector<std::unique_ptr<Parameter>> float_params;
+    float_params.emplace_back(
+                std::make_unique<Parameter>(
+                    "value",
+                    std::make_unique<PrimitiveTypeId>("float")));
+
+    std::vector<std::unique_ptr<Parameter>> int_params;
+    int_params.emplace_back(
+                std::make_unique<Parameter>(
+                    "value",
+                    std::make_unique<PrimitiveTypeId>("int")));
+
     AST::Function print_float_prototype {
-        "print",
-        std::move(params),
-        std::make_unique<TypeId>("void", TypeId::Kind::Single),
+        "print_float",
+        std::move(float_params),
+        std::make_unique<PrimitiveTypeId>("void"),
         nullptr
     };
     generateFunction(print_float_prototype, [&]() {
@@ -148,19 +158,43 @@ void Codegen::add_utility_functions()
                 Constant::getNullValue(IntegerType::getInt32Ty(context));
         Value* format_ref = builder.CreateInBoundsGEP(gv, {zero, zero});
 
-        Variable float_value_arg {"value"};
         CallInst* call = builder.CreateCall(
                     printf_func,
-                    {format_ref, rvalue(generate(float_value_arg))}
+                    {format_ref, rvalue(generate(Variable{"value"}))}
         );
-        call->setTailCall(false);
-        return nullptr;
+        return generate(BlankExpr{});
+    });
+    AST::Function print_int_prototype {
+        "print_int",
+        std::move(int_params),
+        std::make_unique<PrimitiveTypeId>("void"),
+        nullptr
+    };
+    generateFunction(print_int_prototype, [&]() {
+        std::string format = "%d\n";
+        Constant* format_cstr =
+                ConstantDataArray::getString(context, format);
+        GlobalVariable* gv = new GlobalVariable(
+                    module, ArrayType::get(
+                        IntegerType::get(context, 8), format.length() + 1
+                    ),
+                    true, GlobalValue::PrivateLinkage,
+                    format_cstr, "printf_format");
+        Constant* zero =
+                Constant::getNullValue(IntegerType::getInt32Ty(context));
+        Value* format_ref = builder.CreateInBoundsGEP(gv, {zero, zero});
+
+        CallInst* call = builder.CreateCall(
+                    printf_func,
+                    {format_ref, rvalue(generate(Variable{"value"}))}
+        );
+        return generate(BlankExpr{});
     });
 
     AST::Function input_float_prototype {
-        "input",
+        "input_float",
         {},
-        std::make_unique<TypeId>("float", TypeId::Kind::Single),
+        std::make_unique<PrimitiveTypeId>("float"),
         nullptr
     };
     generateFunction(input_float_prototype, [&]() {
@@ -186,13 +220,44 @@ void Codegen::add_utility_functions()
 
         CallInst* call = builder.CreateCall(
                     scanf_func, {format_ref, float_ref});
-        call->setTailCall(false);
 
         return builder.CreateLoad(float_alloca, "floattmp");
     });
+    AST::Function input_int_prototype {
+        "input_int",
+        {},
+        std::make_unique<PrimitiveTypeId>("int"),
+        nullptr
+    };
+    generateFunction(input_int_prototype, [&]() {
+        std::string format = "%d";
+        Constant* format_cstr =
+                ConstantDataArray::getString(context, format);
+        GlobalVariable* format_gv = new GlobalVariable(
+                    module, ArrayType::get(
+                        IntegerType::get(context, 8), format.length() + 1
+                    ),
+                    true, GlobalValue::PrivateLinkage, format_cstr, "scanf_format");
+        Constant* zero =
+                Constant::getNullValue(IntegerType::getInt32Ty(context));
+        Value* format_ref = builder.CreateInBoundsGEP(format_gv, {zero, zero});
+
+        llvm::Function* function = builder.GetInsertBlock()->getParent();
+
+        auto func = builder.GetInsertBlock()->getParent();
+        AllocaInst* int_alloca = create_entry_block_alloca(
+                    func, Type::getInt32Ty(context), "input_int");
+
+        Value* float_ref = builder.CreateInBoundsGEP(int_alloca, {zero});
+
+        CallInst* call = builder.CreateCall(
+                    scanf_func, {format_ref, float_ref});
+
+        return builder.CreateLoad(int_alloca, "inttmp");
+    });
 }
 
-Value* Codegen::generate(Program& p)
+Value* Codegen::generate(const Program& p)
 {
     Value* entrypoint = nullptr;
 
@@ -213,14 +278,14 @@ Value* Codegen::generate(Program& p)
     return entrypoint;
 }
 
-Value* Codegen::generate(AST::Function& f)
+Value* Codegen::generate(const AST::Function& f)
 {
     return generateFunction(f, [this, &f]() {
         return generate(*f.body);
     });
 }
 
-Value* Codegen::generateFunction(AST::Function& f, std::function<Value*()> body_gen)
+Value* Codegen::generateFunction(const AST::Function& f, std::function<Value*()> body_gen)
 {
     if (module.getFunction(f.name)) {
         throw FunctionAlreadyDefinedError{};
@@ -230,10 +295,10 @@ Value* Codegen::generateFunction(AST::Function& f, std::function<Value*()> body_
     std::transform(std::cbegin(f.params), std::cend(f.params),
                    std::back_inserter(param_types),
                    [this](const auto& param) {
-        return get_builtin_type(*param->type);
+        return get_type(param->type.get());
     });
 
-    Type* static_return_type = get_builtin_type(*f.return_type);
+    Type* static_return_type = get_type(f.return_type.get());
     FunctionType* func_type =
             FunctionType::get(
                 static_return_type,
@@ -252,20 +317,22 @@ Value* Codegen::generateFunction(AST::Function& f, std::function<Value*()> body_
     BasicBlock* bb = BasicBlock::Create(context, "entry", func);
     builder.SetInsertPoint(bb);
     {
-        auto scope_guard = named_values.make_inner_scope();
+        auto scope_guard = variables.make_inner_scope();
 
         for (auto& arg : func->args()) {
             AllocaInst* alloca =
-                    create_entry_block_alloca(func, arg.getType(), arg.getName());
+                    create_entry_block_alloca(
+                        func, arg.getType(), arg.getName());
 
             builder.CreateStore(&arg, alloca);
 
-            named_values.value_from_current_scope(arg.getName()) = alloca;
+            variables.value_from_current_scope(arg.getName()) = alloca;
         }
 
         Value* return_value = rvalue(body_gen());
         if (return_value) {
-            Type* type = type_check(*f.return_type, return_value->getType());
+            Type* type = type_check(
+                        f.return_type.get(), return_value->getType());
             if (type->isVoidTy()) {
                 builder.CreateRetVoid();
             }
@@ -274,7 +341,7 @@ Value* Codegen::generateFunction(AST::Function& f, std::function<Value*()> body_
             }
         }
         else {
-            type_check(*f.return_type, Type::getVoidTy(context));
+            type_check(f.return_type.get(), Type::getVoidTy(context));
             builder.CreateRetVoid();
         }
     }
@@ -282,14 +349,9 @@ Value* Codegen::generateFunction(AST::Function& f, std::function<Value*()> body_
     return func;
 }
 
-Value* Codegen::generate(Parameter&)
+Value* Codegen::generate(const Block& b)
 {
-    throw UnreachableCodeError{};
-}
-
-Value* Codegen::generate(Block& b)
-{
-    auto scope_guard = named_values.make_inner_scope();
+    auto scope_guard = variables.make_inner_scope();
 
     Value* expr_value = nullptr;
     for (const auto& expr : b.exprs) {
@@ -298,12 +360,7 @@ Value* Codegen::generate(Block& b)
     return expr_value;
 }
 
-Value* Codegen::generate(TypeId& t)
-{
-    throw UnreachableCodeError{};
-}
-
-Value* Codegen::generate(Definition& d)
+Value* Codegen::generate(const Definition& d)
 {
     llvm::Function* function = builder.GetInsertBlock()->getParent();
 
@@ -311,16 +368,16 @@ Value* Codegen::generate(Definition& d)
     if (!rhs) {
         throw UnexpectedBlankExpressionError{};
     }
-    Type* type = type_check(*d.type, rhs->getType());
+    Type* type = type_check(d.type.get(), rhs->getType());
 
     AllocaInst* alloca = create_entry_block_alloca(function, type, d.name);
     builder.CreateStore(rhs, alloca);
-    named_values.value_from_current_scope(d.name) = alloca;
+    variables.value_from_current_scope(d.name) = alloca;
 
     return rhs;
 }
 
-Value* Codegen::generate(BinaryOperation& b)
+Value* Codegen::generate(const BinaryOperation& b)
 {
     Value* lhs = generate(*b.lhs);
     Value* rhs = generate(*b.rhs);
@@ -335,7 +392,7 @@ Value* Codegen::generate(BinaryOperation& b)
     return binop;
 }
 
-Value* Codegen::generate(UnaryOperation& u)
+Value* Codegen::generate(const UnaryOperation& u)
 {
     Value* expr = rvalue(generate(*u.expr));
     if (!expr) {
@@ -353,7 +410,7 @@ Value* Codegen::generate(UnaryOperation& u)
     return expr;
 }
 
-Value* Codegen::generate(IfElseExpr& i)
+Value* Codegen::generate(const IfElseExpr& i)
 {
     llvm::Function* func = builder.GetInsertBlock()->getParent();
 
@@ -407,7 +464,7 @@ Value* Codegen::generate(IfElseExpr& i)
     return phi_node;
 }
 
-Value* Codegen::generate(WhileExpr& w)
+Value* Codegen::generate(const WhileExpr& w)
 {
     llvm::Function* func = builder.GetInsertBlock()->getParent();
 
@@ -442,7 +499,7 @@ Value* Codegen::generate(WhileExpr& w)
     return nullptr;
 }
 
-Value* Codegen::generate(FunctionCall& f)
+Value* Codegen::generate(const FunctionCall& f)
 {
     llvm::Function* callee = module.getFunction(f.callee_name);
     if (!callee) {
@@ -463,43 +520,64 @@ Value* Codegen::generate(FunctionCall& f)
     return builder.CreateCall(callee, actual_args);
 }
 
-Value* Codegen::generate(Variable& v)
+Value* Codegen::generate(const Variable& v)
 {
-    return named_values[v.name];
+    return variables[v.name];
 }
 
-Value* Codegen::generate(ArrayAccess& a)
+Value* Codegen::generate(const ArrayAccess& a)
 {
-
+    auto zero = ConstantInt::get(Type::getInt32Ty(context), 0, false);
+    std::vector<Value*> index_values = { zero };
+    for (const auto& expr : a.index_exprs) {
+        index_values.push_back(rvalue(generate(*expr)));
+    }
+    Value* ptr = variables[a.name];
+    return builder.CreateGEP(ptr, index_values, "arraygep");;
 }
 
-Value* Codegen::generate(BoolValue& v)
+Value* Codegen::generate(const BoolValue& v)
 {
     return ConstantInt::get(Type::getInt1Ty(context), v.value, false);
 }
 
-Value* Codegen::generate(IntValue& v)
+Value* Codegen::generate(const IntValue& v)
 {
     return ConstantInt::get(Type::getInt32Ty(context), v.value, true);
 }
 
-Value* Codegen::generate(FloatValue& v)
+Value* Codegen::generate(const FloatValue& v)
 {
     return ConstantFP::get(Type::getDoubleTy(context), v.value);
 }
 
-Value* Codegen::generate(ArrayLiteral& arr)
+Value* Codegen::generate(const ArrayExpr& arr)
 {
-    // TODO
-    return nullptr;
+    llvm::Function* func = builder.GetInsertBlock()->getParent();
+
+    std::vector<Value*> elem_values;
+    for (const auto& elem : arr.elements) {
+        elem_values.push_back(rvalue(generate(*elem)));
+    }
+
+    AllocaInst* alloca = create_entry_block_alloca(
+                func,
+                ArrayType::get(elem_values[0]->getType(), elem_values.size()),
+                "arraytmp");
+    Value* array = builder.CreateLoad(alloca);
+    for (unsigned int i = 0; i < elem_values.size(); ++i) {
+        array = builder.CreateInsertValue(
+                    array, elem_values[i], ArrayRef<unsigned int>(i));
+    }
+    return array;
 }
 
-Value* Codegen::generate(NullValue&)
+Value* Codegen::generate(const NullValue&)
 {
     return Constant::getNullValue(Type::getVoidTy(context));
 }
 
-Value* Codegen::generate(BlankExpr&)
+Value* Codegen::generate(const BlankExpr&)
 {
     return nullptr;
 }
@@ -640,8 +718,8 @@ Value* Codegen::rvalue(Value* value)
         return nullptr;
     }
     Value* rval = nullptr;
-    if (isa<AllocaInst>(value)) {
-        rval = builder.CreateLoad(value);
+    if (isa<AllocaInst>(value) || isa<GetElementPtrInst>(value)) {
+        rval = builder.CreateLoad(value, "tmp");
     }
     return rval ? rval : value;
 }
@@ -666,31 +744,56 @@ AllocaInst* Codegen::create_entry_block_alloca(
     return tmp_builder.CreateAlloca(var_type, nullptr, var_name.c_str());
 }
 
-llvm::Type* Codegen::get_builtin_type(const TypeId& type)
+llvm::Type* Codegen::get_primitive_type(const PrimitiveTypeId& type_id)
 {
-    // TODO: arrays
-    if (type.name == "bool") {
+    if (type_id.name == "bool") {
         return Type::getInt1Ty(context);
     }
-    if (type.name == "int") {
+    if (type_id.name == "int") {
         return Type::getInt32Ty(context);
     }
-    if (type.name == "float") {
+    if (type_id.name == "float") {
         return Type::getDoubleTy(context);
     }
-    if (type.name == "void") {
+    if (type_id.name == "void") {
         return Type::getVoidTy(context);
     }
     throw NoSuchTypeError{};
 }
 
-llvm::Type* Codegen::type_check(const TypeId& type, Type* deducted)
+llvm::Type* Codegen::get_array_type(const ArrayTypeId& array_type_id)
 {
-    if (type.name == "") {
-        return deducted;
+    Type* elem_type = get_primitive_type(array_type_id.name);
+    Type* array_type = elem_type;
+    for (int dim_size : boost::adaptors::reverse(array_type_id.dim_sizes)) {
+        if (dim_size <= 0) {
+            throw NonPositiveDimSizeError{};
+        }
+        array_type = ArrayType::get(array_type, dim_size);
     }
-    Type* static_type = get_builtin_type(type);
-    if (static_type != deducted) {
+    return array_type;
+}
+
+llvm::Type* Codegen::get_type(StaticTypeId* type_id)
+{
+    if (auto primitive_typeid = dynamic_cast<PrimitiveTypeId*>(type_id)) {
+        return get_primitive_type(*primitive_typeid);
+    }
+    if (auto array_typeid = dynamic_cast<ArrayTypeId*>(type_id)) {
+        return get_array_type(*array_typeid);
+    }
+    return nullptr;
+}
+
+llvm::Type* Codegen::type_check(StaticTypeId* type_id, Type* deduced)
+{
+    if (dynamic_cast<EmptyTypeId*>(type_id)) {
+        return deduced;
+    }
+    Type* static_type = get_type(type_id);
+    if (static_type != deduced) {
+        static_type->dump();
+        deduced->dump();
         throw TypeMismatchError{};
     }
     return static_type;
@@ -701,13 +804,15 @@ Type* Codegen::common_type(const std::vector<Value*>& values)
     if (!*std::cbegin(values)) {
         return nullptr;
     }
-    Type* common = (*std::cbegin(values))->getType();
-    for (const auto& value : values) {
-        if (!value || value->getType() != common) {
-            return nullptr;
-        }
+    Type* common_type = (*std::cbegin(values))->getType();
+    auto of_common_type = [common_type](const auto& value) {
+        return value && value->getType() == common_type;
+    };
+
+    if (std::all_of(std::cbegin(values), std::cend(values), of_common_type)) {
+        return common_type;
     }
-    return common;
+    return nullptr;
 }
 
 std::vector<Value*> Codegen::convert_numeric_to_float(std::vector<Value*> values)
@@ -727,9 +832,12 @@ llvm::Value* Codegen::generate(Node& node)
 
 void Codegen::accept(Program& n)         { latest_llvm_value = generate(n); }
 void Codegen::accept(AST::Function& n)   { latest_llvm_value = generate(n); }
-void Codegen::accept(Parameter& n)       { latest_llvm_value = generate(n); }
+void Codegen::accept(Parameter& n)       { }
 void Codegen::accept(Block& n)           { latest_llvm_value = generate(n); }
-void Codegen::accept(TypeId& n)          { latest_llvm_value = generate(n); }
+void Codegen::accept(StaticTypeId& n)    { }
+void Codegen::accept(PrimitiveTypeId& n) { }
+void Codegen::accept(ArrayTypeId& n)     { }
+void Codegen::accept(EmptyTypeId& n)     { }
 void Codegen::accept(Definition& n)      { latest_llvm_value = generate(n); }
 void Codegen::accept(BinaryOperation& n) { latest_llvm_value = generate(n); }
 void Codegen::accept(UnaryOperation& n)  { latest_llvm_value = generate(n); }
@@ -741,6 +849,6 @@ void Codegen::accept(ArrayAccess& n)     { latest_llvm_value = generate(n); }
 void Codegen::accept(BoolValue& n)       { latest_llvm_value = generate(n); }
 void Codegen::accept(IntValue& n)        { latest_llvm_value = generate(n); }
 void Codegen::accept(FloatValue& n)      { latest_llvm_value = generate(n); }
-void Codegen::accept(ArrayLiteral& n)    { latest_llvm_value = generate(n); }
+void Codegen::accept(ArrayExpr& n)       { latest_llvm_value = generate(n); }
 void Codegen::accept(NullValue& n)       { latest_llvm_value = generate(n); }
 void Codegen::accept(BlankExpr& n)       { latest_llvm_value = generate(n); }

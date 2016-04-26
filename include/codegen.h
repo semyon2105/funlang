@@ -53,30 +53,28 @@ private:
 
     llvm::Module module;
     llvm::IRBuilder<> builder;
-    ScopedSymbolTable named_values;
+    ScopedSymbolTable variables;
 
-    llvm::Value* generate(Program&);
+    llvm::Value* generate(const Program&);
 
-    llvm::Value* generate(Function&);
-    llvm::Value* generateFunction(Function&, std::function<llvm::Value*()>);
+    llvm::Value* generate(const Function&);
+    llvm::Value* generateFunction(const Function&, std::function<llvm::Value*()>);
 
-    llvm::Value* generate(Parameter&);
-    llvm::Value* generate(Block&);
-    llvm::Value* generate(TypeId&);
-    llvm::Value* generate(Definition&);
-    llvm::Value* generate(BinaryOperation&);
-    llvm::Value* generate(UnaryOperation&);
-    llvm::Value* generate(IfElseExpr&);
-    llvm::Value* generate(WhileExpr&);
-    llvm::Value* generate(FunctionCall&);
-    llvm::Value* generate(Variable&);
-    llvm::Value* generate(ArrayAccess&);
-    llvm::Value* generate(BoolValue&);
-    llvm::Value* generate(IntValue&);
-    llvm::Value* generate(FloatValue&);
-    llvm::Value* generate(ArrayLiteral&);
-    llvm::Value* generate(NullValue&);
-    llvm::Value* generate(BlankExpr&);
+    llvm::Value* generate(const Block&);
+    llvm::Value* generate(const Definition&);
+    llvm::Value* generate(const BinaryOperation&);
+    llvm::Value* generate(const UnaryOperation&);
+    llvm::Value* generate(const IfElseExpr&);
+    llvm::Value* generate(const WhileExpr&);
+    llvm::Value* generate(const FunctionCall&);
+    llvm::Value* generate(const Variable&);
+    llvm::Value* generate(const ArrayAccess&);
+    llvm::Value* generate(const BoolValue&);
+    llvm::Value* generate(const IntValue&);
+    llvm::Value* generate(const FloatValue&);
+    llvm::Value* generate(const ArrayExpr&);
+    llvm::Value* generate(const NullValue&);
+    llvm::Value* generate(const BlankExpr&);
 
     void add_utility_functions();
     llvm::Function* add_main_function();
@@ -102,14 +100,20 @@ private:
     llvm::AllocaInst* create_entry_block_alloca(llvm::Function*, llvm::Type*,
                                                 const std::string&);
 
-    llvm::Type* get_builtin_type(const TypeId&);
-    llvm::Type* type_check(const TypeId&, llvm::Type*);
+    llvm::Type* get_primitive_type(const PrimitiveTypeId&);
+    llvm::Type* get_array_type(const ArrayTypeId&);
+    llvm::Type* get_type(StaticTypeId*);
+
+    llvm::Type* type_check(StaticTypeId*, llvm::Type*);
 
     void accept(Program&) override;
     void accept(Function&) override;
     void accept(Parameter&) override;
     void accept(Block&) override;
-    void accept(TypeId&) override;
+    void accept(StaticTypeId&) override;
+    void accept(PrimitiveTypeId&) override;
+    void accept(ArrayTypeId&) override;
+    void accept(EmptyTypeId&) override;
     void accept(Definition&) override;
     void accept(BinaryOperation&) override;
     void accept(UnaryOperation&) override;
@@ -121,7 +125,7 @@ private:
     void accept(BoolValue&) override;
     void accept(IntValue&) override;
     void accept(FloatValue&) override;
-    void accept(ArrayLiteral&) override;
+    void accept(ArrayExpr&) override;
     void accept(NullValue&) override;
     void accept(BlankExpr&) override;
 
