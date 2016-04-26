@@ -1,13 +1,13 @@
-function factorial(n:float) : float
+function factorial(n:int) : int
 {
     if n > 0 {
         n * factorial(n - 1)
     }
-    else { 1.0 }
+    else { 1 }
 }
 
 function main() : void
 {
-    let n : float = input_float();
-    print_float(factorial(n));
+    let n = input_int();
+    print_int(factorial(n));
 }

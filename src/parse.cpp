@@ -298,12 +298,65 @@ std::unique_ptr<Expression> Parser::conditional()
 
     Token::Kind cond_op = current_token->kind;
     if (cond_op == '<' || cond_op == '>' ||
-        cond_op == Token::EQ || cond_op == Token::NEQ ||
         cond_op == Token::LE || cond_op == Token::GE)
     {
         auto op_token = consume(cond_op);
         auto kind = BinaryOperation::from_token_kind(op_token->kind);
         auto rhs = conditional();
+        return std::make_unique<BinaryOperation>(
+                    std::move(lhs), kind, std::move(rhs)
+        );
+    }
+
+    return lhs;
+}
+
+std::unique_ptr<Expression> Parser::eq_neq()
+{
+    auto lhs = conditional();
+
+    Token::Kind eq_neq_op = current_token->kind;
+    if (eq_neq_op == Token::EQ || eq_neq_op == Token::NEQ)
+    {
+        auto op_token = consume(eq_neq_op);
+        auto kind = BinaryOperation::from_token_kind(op_token->kind);
+        auto rhs = eq_neq();
+        return std::make_unique<BinaryOperation>(
+                    std::move(lhs), kind, std::move(rhs)
+        );
+    }
+
+    return lhs;
+}
+
+std::unique_ptr<Expression> Parser::and_op()
+{
+    auto lhs = eq_neq();
+
+    Token::Kind andop = current_token->kind;
+    if (andop == Token::AND)
+    {
+        auto op_token = consume(andop);
+        auto kind = BinaryOperation::from_token_kind(op_token->kind);
+        auto rhs = and_op();
+        return std::make_unique<BinaryOperation>(
+                    std::move(lhs), kind, std::move(rhs)
+        );
+    }
+
+    return lhs;
+}
+
+std::unique_ptr<Expression> Parser::or_op()
+{
+    auto lhs = and_op();
+
+    Token::Kind orop = current_token->kind;
+    if (orop == Token::OR)
+    {
+        auto op_token = consume(orop);
+        auto kind = BinaryOperation::from_token_kind(op_token->kind);
+        auto rhs = or_op();
         return std::make_unique<BinaryOperation>(
                     std::move(lhs), kind, std::move(rhs)
         );
@@ -329,7 +382,7 @@ std::vector<std::unique_ptr<Expression>> Parser::optargs()
 
 std::unique_ptr<Expression> Parser::assignment()
 {
-    auto lhs = conditional();
+    auto lhs = or_op();
     if (auto lvalue = dynamic_cast<LValue*>(lhs.get())
         && current_token->kind == '=')
     {

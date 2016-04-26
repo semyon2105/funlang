@@ -28,7 +28,7 @@ struct FunctionAlreadyDefinedError      : CodegenError {};
 struct TypeMismatchError                : CodegenError {};
 struct NoSuchTypeError                  : CodegenError {};
 struct InvalidBinaryOperationError      : CodegenError {};
-struct UnexpectedBlankExpressionError   : CodegenError {};
+struct UnexpectedNullLlvmValue   : CodegenError {};
 struct MainFunctionNotDefined           : CodegenError {};
 struct NonPositiveDimSizeError          : CodegenError {};
 struct ZeroLengthArrayError           : CodegenError {};
@@ -366,7 +366,7 @@ Value* Codegen::generate(const Definition& d)
 
     Value* rhs = rvalue(generate(*d.rhs));
     if (!rhs) {
-        throw UnexpectedBlankExpressionError{};
+        throw UnexpectedNullLlvmValue{};
     }
     Type* type = type_check(d.type.get(), rhs->getType());
 
@@ -382,7 +382,7 @@ Value* Codegen::generate(const BinaryOperation& b)
     Value* lhs = generate(*b.lhs);
     Value* rhs = generate(*b.rhs);
     if (!lhs || !rhs) {
-        throw UnexpectedBlankExpressionError{};
+        throw UnexpectedNullLlvmValue{};
     }
 
     Value* binop = match_binop(b.kind, lhs, rhs);
@@ -396,7 +396,7 @@ Value* Codegen::generate(const UnaryOperation& u)
 {
     Value* expr = rvalue(generate(*u.expr));
     if (!expr) {
-        throw UnexpectedBlankExpressionError{};
+        throw UnexpectedNullLlvmValue{};
     }
     if (u.kind == UnaryOperation::Kind::Minus) {
         expr = builder.CreateNeg(expr, "negtmp", false, false);
@@ -424,7 +424,12 @@ Value* Codegen::generate(const IfElseExpr& i)
     BasicBlock* else_body_bb = BasicBlock::Create(context, "else_body");
     BasicBlock* after_ifelse_bb = BasicBlock::Create(context, "after_ifelse");
 
-    builder.CreateCondBr(cond, if_body_bb, else_body_bb);
+    if (i.else_body) {
+        builder.CreateCondBr(cond, if_body_bb, else_body_bb);
+    }
+    else {
+        builder.CreateCondBr(cond, if_body_bb, after_ifelse_bb);
+    }
 
     builder.SetInsertPoint(if_body_bb);
     Value* if_br = generate(*i.if_body);
@@ -513,7 +518,7 @@ Value* Codegen::generate(const FunctionCall& f)
     for (const auto& arg : f.args) {
         actual_args.push_back(rvalue(generate(*arg)));
         if (!actual_args.back()) {
-            throw UnexpectedBlankExpressionError{};
+            throw UnexpectedNullLlvmValue{};
         }
     }
 
@@ -614,6 +619,10 @@ Value* Codegen::match_bool_binop(BinaryOperation::Kind kind,
             return builder.CreateICmpEQ(rval_lhs, rval_rhs, "cmpeqtmp");
         case BinaryOperation::Kind::NotEq:
             return builder.CreateICmpNE(rval_lhs, rval_rhs, "cmpnetmp");
+        case BinaryOperation::Kind::And:
+            return builder.CreateAnd(rval_lhs, rval_rhs, "andtmp");
+        case BinaryOperation::Kind::Or:
+            return builder.CreateOr(rval_lhs, rval_rhs, "ortmp");
         default:
             throw InvalidBinaryOperationError{};
         }

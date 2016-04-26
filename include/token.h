@@ -12,6 +12,7 @@ class Token
 public:
     enum Kind
     {
+        AND,
         ELSE = 256,
         EQ,
         FALSE,
@@ -25,6 +26,7 @@ public:
         LET,
         NEQ,
         NULLVAL,
+        OR,
         TRUE,
         WHILE,
         ERROR
@@ -44,6 +46,7 @@ public:
         }
         switch (kind)
         {
+            case Token::AND:        return "\'&&\'";
             case Token::ELSE:       return "ELSE";
             case Token::EQ:         return "\'==\'";
             case Token::ERROR:      return "ERROR";
@@ -58,6 +61,7 @@ public:
             case Token::LET:        return "LET";
             case Token::NEQ:        return "\'!=\'";
             case Token::NULLVAL:    return "NULLVAL";
+            case Token::OR:         return "\'||\'";
             case Token::TRUE:       return "TRUE";
             case Token::WHILE:      return "WHILE";
             default:

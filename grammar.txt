@@ -14,9 +14,15 @@ typeid ::= <id> ('[' <integer> ']')*
 
 assign ::=
       lvalue ('=' assign)?
-    | cond
+    | or_op
 
-cond ::= addsub (('<'|'>'|'=='|'!='|'<='|'>=') addsub)*
+or_op ::= and_op ('||' and_op)*
+
+and_op ::= eq_neq ('&&' eq_neq)*
+
+eq_neq ::= cond (('=='|'!=') cond)*
+
+cond ::= addsub (('<'|'>'|'<='|'>=') addsub)*
 
 addsub ::= muldiv (('+'|'-') muldiv)*
 

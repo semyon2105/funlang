@@ -81,6 +81,8 @@ BinaryOperation::Kind BinaryOperation::from_token_kind(const Token::Kind& kind)
         case Token::NEQ: return Kind::NotEq;
         case Token::LE: return Kind::LeEq;
         case Token::GE: return Kind::GrEq;
+        case Token::AND: return Kind::And;
+        case Token::OR: return Kind::Or;
         default: return static_cast<Kind>(-1);
     }
 }
@@ -97,7 +99,9 @@ BinaryOperation::kind_strings {
         { Kind::Equal, "Equal" },
         { Kind::NotEq, "NotEq" },
         { Kind::LeEq, "LeEq" },
-        { Kind::GrEq, "GrEq" }
+        { Kind::GrEq, "GrEq" },
+        { Kind::And, "And" },
+        { Kind::Or, "Or" }
 };
 
 UnaryOperation::UnaryOperation(Kind kind, std::unique_ptr<Expression> expr)
@@ -164,21 +168,6 @@ FloatValue::FloatValue(double value)
     : value{value}
 {
 }
-
-/*ArrayTypeId deduce_array_typeid(ArrayExpr* array)
-{
-    std::vector<int> dim_sizes;
-    ArrayExpr* last_literal = nullptr;
-    for (auto subarray = array; subarray != nullptr;
-         last_literal = subarray,
-         subarray = dynamic_cast<ArrayExpr*>(subarray->elements[0].get()))
-    {
-        dim_sizes.push_back(subarray->elements.size());
-    }
-    Literal* lit = last_literal->elements[0].get();
-    auto primitive = dynamic_cast<const PrimitiveTypeId&>(lit->deduced_type());
-    return { primitive.name(), std::move(dim_sizes) };
-}*/
 
 void Program::accept(Visitor& v) { v.accept(*this); }
 void Function::accept(Visitor& v) { v.accept(*this); }

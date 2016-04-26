@@ -175,7 +175,9 @@ struct BinaryOperation : Expression
         Equal,
         NotEq,
         LeEq,
-        GrEq
+        GrEq,
+        And,
+        Or
     };
 
     static const std::map<Kind, const std::string> kind_strings;

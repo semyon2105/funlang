@@ -1,0 +1,43 @@
+function quicksort(array: float[5], start: int, end: int) : float[5]
+{
+    let i = start;
+    let j = end;
+    if end - start >= 1 {
+        let pivot = array[start];
+
+        while j > i {
+            while array[i] <= pivot && i <= end && j > i { i = i + 1 };
+            while array[j] > pivot && j >= start && j >= i { j = j - 1 };
+            if j > i {
+                let temp = array[i];
+                array[i] = array[j];
+                array[j] = temp;
+            };
+        };
+
+        let temp = array[start];
+        array[start] = array[j];
+        array[j] = temp;
+
+        array = quicksort(array, start, j - 1);
+        array = quicksort(array, j + 1, end);
+    };
+    array
+}
+
+function main() : void
+{
+    let array : float[5] = [ 0.0, 0.0, 0.0, 0.0, 0.0 ];
+    let i = 0;
+    while i != 5 {
+        array[i] = input_float();
+        i = i + 1;
+    };
+
+    array = quicksort(array, 0, 4);
+    let i = 0;
+    while i != 5 {
+        print_float(array[i]);
+        i = i + 1;
+    };
+}

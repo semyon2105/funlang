@@ -62,6 +62,16 @@ public:
                    ? std::make_unique<Token>(Token::LE)
                    : std::make_unique<Token>(Token::GE);
         }
+        else if (ch == '&' && look_ahead() == '&')
+        {
+            consume();
+            return std::make_unique<Token>(Token::AND);
+        }
+        else if (ch == '|' && look_ahead() == '|')
+        {
+            consume();
+            return std::make_unique<Token>(Token::OR);
+        }
         else if (Token::valid_chars.find(ch) != std::string::npos)
         {
             return std::make_unique<Token>(ch);

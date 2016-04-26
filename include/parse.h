@@ -77,44 +77,53 @@ private:
                         auto assignment()
                             -> std::unique_ptr<AST::Expression>;
 
-                            auto conditional()
+                            auto or_op()
                                 -> std::unique_ptr<AST::Expression>;
 
-                                auto addsub()
+                                auto and_op()
                                     -> std::unique_ptr<AST::Expression>;
 
-                                    auto muldiv()
+                                    auto eq_neq()
                                         -> std::unique_ptr<AST::Expression>;
 
-                                        auto primary()
+                                        auto conditional()
                                             -> std::unique_ptr<AST::Expression>;
 
-                                            auto definition()
-                                                -> std::unique_ptr<AST::Definition>;
-
-                                            auto if_else_expr()
+                                            auto addsub()
                                                 -> std::unique_ptr<AST::Expression>;
 
-                                                auto else_tail()
+                                                auto muldiv()
                                                     -> std::unique_ptr<AST::Expression>;
 
-                                            auto while_expr()
-                                                -> std::unique_ptr<AST::WhileExpr>;
+                                                    auto primary()
+                                                        -> std::unique_ptr<AST::Expression>;
 
-                                            auto function_call()
-                                                -> std::unique_ptr<AST::FunctionCall>;
+                                                        auto definition()
+                                                            -> std::unique_ptr<AST::Definition>;
 
-                                                auto optargs()
-                                                    -> std::vector<std::unique_ptr<AST::Expression>>;
+                                                        auto if_else_expr()
+                                                            -> std::unique_ptr<AST::Expression>;
 
-                                            auto array()
-                                                -> std::unique_ptr<AST::ArrayExpr>;
+                                                            auto else_tail()
+                                                                -> std::unique_ptr<AST::Expression>;
 
-                                            auto literal()
-                                                -> std::unique_ptr<AST::Literal>;
+                                                        auto while_expr()
+                                                            -> std::unique_ptr<AST::WhileExpr>;
 
-                                            auto lvalue()
-                                                -> std::unique_ptr<AST::LValue>;
+                                                        auto function_call()
+                                                            -> std::unique_ptr<AST::FunctionCall>;
+
+                                                            auto optargs()
+                                                                -> std::vector<std::unique_ptr<AST::Expression>>;
+
+                                                        auto array()
+                                                            -> std::unique_ptr<AST::ArrayExpr>;
+
+                                                        auto literal()
+                                                            -> std::unique_ptr<AST::Literal>;
+
+                                                        auto lvalue()
+                                                            -> std::unique_ptr<AST::LValue>;
 
 
 };
