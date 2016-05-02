@@ -1,13 +1,14 @@
 #include <functional>
 #include <memory>
 
-#include <boost/core/demangle.hpp>
 #include <boost/range/adaptor/reversed.hpp>
 
 #include <llvm/IR/TypeBuilder.h>
 #include <llvm/IR/Verifier.h>
 #include <llvm/Support/raw_ostream.h>
+#include <llvm/Support/raw_os_ostream.h>
 
+#include "ast_printer.h"
 #include "codegen.h"
 
 using namespace llvm;
@@ -16,31 +17,62 @@ using namespace Funlang;
 using namespace Funlang::AST;
 using namespace Funlang::AST::impl;
 
-struct CodegenError {};
+struct impl::CodegenError : std::exception
+{
+    Node* node = nullptr;
+};
 
-struct UndefinedVariableError           : CodegenError {};
-struct TypeError                        : CodegenError {};
-struct UnreachableCodeError             : CodegenError {};
-struct InvalidExpressionError           : CodegenError {};
-struct UndefinedReferenceError          : CodegenError {};
-struct IncorrectNumberOfArgumentsError  : CodegenError {};
-struct FunctionAlreadyDefinedError      : CodegenError {};
-struct TypeMismatchError                : CodegenError {};
-struct NoSuchTypeError                  : CodegenError {};
-struct InvalidBinaryOperationError      : CodegenError {};
-struct UnexpectedNullLlvmValue   : CodegenError {};
-struct MainFunctionNotDefined           : CodegenError {};
-struct NonPositiveDimSizeError          : CodegenError {};
-struct ZeroLengthArrayError           : CodegenError {};
+//struct UndefinedVariableError           : CodegenError {};
+struct impl::TypeError : CodegenError
+{
+    TypeError(Type* expected, Type* got)
+        : expected{expected}, got{got} {}
+
+    const llvm::Type* expected;
+    const llvm::Type* got;
+};
+
+struct impl::UnreachableCodeError             : CodegenError {};
+struct impl::InvalidExpressionError           : CodegenError {};
+struct impl::UndefinedReferenceError          : CodegenError {};
+struct impl::IncorrectNumberOfArgumentsError  : CodegenError {};
+struct impl::FunctionAlreadyDefinedError      : CodegenError {};
+struct impl::NoSuchTypeError                  : CodegenError {};
+struct impl::InvalidBinaryOperationError      : CodegenError {};
+struct impl::MainFunctionNotDefinedError      : CodegenError {};
+struct impl::NonPositiveDimSizeError          : CodegenError {};
+struct impl::ZeroLengthArrayError             : CodegenError {};
+struct impl::UnspecifiedTypeError             : CodegenError {};
 
 std::string AST::codegen(Program& program, LLVMContext& context)
 {
-    Codegen visitor{context};
-    visitor.generate(static_cast<Node&>(program));
-    std::string output;
-    raw_string_ostream os {output};
-    visitor.get_module().print(os, nullptr);
-    return output;
+    try {
+        Codegen codegen{context};
+        codegen.generate(static_cast<Node&>(program));
+        std::string output;
+        raw_string_ostream os {output};
+        codegen.get_module().print(os, nullptr);
+        return output;
+    }
+    catch (const TypeError& error) {
+        raw_os_ostream raw_os {std::cout};
+        raw_os.SetUnbuffered();
+        std::cout << "Error: " << demangle(typeid(error))
+                  << " at line " << error.node->lineno
+                  << "\n\texpected LLVM type: ";
+        error.expected->print(raw_os);
+        std::cout << "\n\tgot: ";
+        error.got->print(raw_os);
+        std::cout << "\nin node:\n";
+        print(*error.node);
+    }
+    catch (const CodegenError& error) {
+        std::cout << "Error: " << demangle(typeid(error))
+                  << " at line " << error.node->lineno
+                  << ", in node:\n";
+        print(*error.node);
+    }
+    std::terminate();
 }
 
 ScopedSymbolTable::ScopedSymbolTable()
@@ -273,7 +305,7 @@ Value* Codegen::generate(const Program& p)
         }
     }
     if (!entrypoint) {
-        throw MainFunctionNotDefined{};
+        throw error<MainFunctionNotDefinedError>();
     }
     return entrypoint;
 }
@@ -288,13 +320,13 @@ Value* Codegen::generate(const AST::Function& f)
 Value* Codegen::generateFunction(const AST::Function& f, std::function<Value*()> body_gen)
 {
     if (module.getFunction(f.name)) {
-        throw FunctionAlreadyDefinedError{};
+        throw error<FunctionAlreadyDefinedError>();
     }
 
     std::vector<Type*> param_types;
     std::transform(std::cbegin(f.params), std::cend(f.params),
                    std::back_inserter(param_types),
-                   [this](const auto& param) {
+                   [this](const std::unique_ptr<Parameter>& param) {
         return get_type(param->type.get());
     });
 
@@ -331,8 +363,8 @@ Value* Codegen::generateFunction(const AST::Function& f, std::function<Value*()>
 
         Value* return_value = rvalue(body_gen());
         if (return_value) {
-            Type* type = type_check(
-                        f.return_type.get(), return_value->getType());
+            Type* type =
+                    type_check(f.return_type.get(), return_value->getType());
             if (type->isVoidTy()) {
                 builder.CreateRetVoid();
             }
@@ -364,9 +396,18 @@ Value* Codegen::generate(const Definition& d)
 {
     llvm::Function* function = builder.GetInsertBlock()->getParent();
 
-    Value* rhs = rvalue(generate(*d.rhs));
-    if (!rhs) {
-        throw UnexpectedNullLlvmValue{};
+    Value* rhs = nullptr;
+    if (d.rhs) {
+        rhs = rvalue(generate(*d.rhs));
+        if (!rhs) {
+            throw error<CodegenError>();
+        }
+    }
+    else {
+        if (!d.type) {
+            throw error<UnspecifiedTypeError>();
+        }
+        rhs = default_initialize(d.type.get());
     }
     Type* type = type_check(d.type.get(), rhs->getType());
 
@@ -382,12 +423,12 @@ Value* Codegen::generate(const BinaryOperation& b)
     Value* lhs = generate(*b.lhs);
     Value* rhs = generate(*b.rhs);
     if (!lhs || !rhs) {
-        throw UnexpectedNullLlvmValue{};
+        throw error<CodegenError>();
     }
 
     Value* binop = match_binop(b.kind, lhs, rhs);
     if (!binop) {
-        throw InvalidExpressionError{};
+        throw error<InvalidExpressionError>();
     }
     return binop;
 }
@@ -396,7 +437,7 @@ Value* Codegen::generate(const UnaryOperation& u)
 {
     Value* expr = rvalue(generate(*u.expr));
     if (!expr) {
-        throw UnexpectedNullLlvmValue{};
+        throw error<CodegenError>();
     }
     if (u.kind == UnaryOperation::Kind::Minus) {
         expr = builder.CreateNeg(expr, "negtmp", false, false);
@@ -405,7 +446,7 @@ Value* Codegen::generate(const UnaryOperation& u)
         expr = builder.CreateNot(expr, "nottmp");
     }
     else {
-        throw CodegenError{};
+        throw error<CodegenError>();
     }
     return expr;
 }
@@ -417,7 +458,7 @@ Value* Codegen::generate(const IfElseExpr& i)
     Value* cond = rvalue(generate(*i.condition));
 
     if (!cond->getType()->isIntegerTy(1)) {
-        throw TypeError{};
+        throw error<TypeError>(Type::getInt1Ty(context), cond->getType());
     }
 
     BasicBlock* if_body_bb = BasicBlock::Create(context, "if_body", func);
@@ -482,12 +523,9 @@ Value* Codegen::generate(const WhileExpr& w)
     builder.SetInsertPoint(header_bb);
     Value* condition = rvalue(generate(*w.condition));
     if (!condition) {
-        throw CodegenError{};
+        throw error<CodegenError>();
     }
-    if (!condition->getType()->isIntegerTy(1)) {
-        condition->getType()->dump();
-        throw TypeError{};
-    }
+    type_check(Type::getInt1Ty(context), condition->getType());
     header_bb = builder.GetInsertBlock();
 
     builder.CreateCondBr(condition, loop_bb, loop_exit_bb);
@@ -508,17 +546,17 @@ Value* Codegen::generate(const FunctionCall& f)
 {
     llvm::Function* callee = module.getFunction(f.callee_name);
     if (!callee) {
-        throw UndefinedReferenceError{};
+        throw error<UndefinedReferenceError>();
     }
     if (callee->arg_size() != f.args.size()) {
-        throw IncorrectNumberOfArgumentsError{};
+        throw error<IncorrectNumberOfArgumentsError>();
     }
 
     std::vector<Value*> actual_args;
     for (const auto& arg : f.args) {
         actual_args.push_back(rvalue(generate(*arg)));
         if (!actual_args.back()) {
-            throw UnexpectedNullLlvmValue{};
+            throw error<CodegenError>();
         }
     }
 
@@ -535,7 +573,9 @@ Value* Codegen::generate(const ArrayAccess& a)
     auto zero = ConstantInt::get(Type::getInt32Ty(context), 0, false);
     std::vector<Value*> index_values = { zero };
     for (const auto& expr : a.index_exprs) {
-        index_values.push_back(rvalue(generate(*expr)));
+        auto rval = rvalue(generate(*expr));
+        type_check(Type::getInt32Ty(context), rval->getType());
+        index_values.push_back(rval);
     }
     Value* ptr = variables[a.name];
     return builder.CreateGEP(ptr, index_values, "arraygep");;
@@ -611,7 +651,13 @@ Value* Codegen::match_bool_binop(BinaryOperation::Kind kind,
                                  Value* rval_lhs, Value* rval_rhs)
 {
     auto types = {rval_lhs->getType(), rval_rhs->getType()};
-    auto is_bool = [](Type* t) { return t->isIntegerTy(1); };
+    Type* last_nonbool_t = nullptr;
+    auto is_bool = [&last_nonbool_t](Type* t) {
+        if (!t->isIntegerTy(1)) {
+            last_nonbool_t = t;
+        }
+        return t->isIntegerTy(1);
+    };
     // build a binop if both lhs and rhs are bools
     if (std::all_of(std::cbegin(types), std::cend(types), is_bool)) {
         switch (kind) {
@@ -624,7 +670,7 @@ Value* Codegen::match_bool_binop(BinaryOperation::Kind kind,
         case BinaryOperation::Kind::Or:
             return builder.CreateOr(rval_lhs, rval_rhs, "ortmp");
         default:
-            throw InvalidBinaryOperationError{};
+            throw error<InvalidBinaryOperationError>();
         }
     }
     // don't build if none are bools
@@ -632,7 +678,7 @@ Value* Codegen::match_bool_binop(BinaryOperation::Kind kind,
         return nullptr;
     }
     // type error if only one is a bool
-    throw TypeError{};
+    throw error<TypeError>(Type::getInt1Ty(context), last_nonbool_t);
 }
 
 Value* Codegen::match_int_binop(BinaryOperation::Kind kind,
@@ -664,7 +710,7 @@ Value* Codegen::match_int_binop(BinaryOperation::Kind kind,
         case BinaryOperation::Kind::GrEq:
             return builder.CreateICmpSGE(rval_lhs, rval_rhs, "cmpsgetmp");
         default:
-            throw InvalidBinaryOperationError{};
+            throw error<InvalidBinaryOperationError>();
         }
     }
     return nullptr;
@@ -707,7 +753,7 @@ Value* Codegen::match_numeric_binop(BinaryOperation::Kind kind,
     case BinaryOperation::Kind::GrEq:
         return builder.CreateFCmpUGE(rval_lhs, rval_rhs, "cmpugetmp");
     default:
-        throw InvalidBinaryOperationError{};
+        throw error<InvalidBinaryOperationError>();
     }
 }
 
@@ -753,6 +799,27 @@ AllocaInst* Codegen::create_entry_block_alloca(
     return tmp_builder.CreateAlloca(var_type, nullptr, var_name.c_str());
 }
 
+Value* Codegen::default_initialize(const StaticTypeId* static_type)
+{
+    if (!static_type) {
+        return nullptr;
+    }
+    Type* type = get_type(static_type);
+    if (type->isIntegerTy(1)) {
+        return ConstantInt::get(Type::getInt1Ty(context), 0, false);
+    }
+    if (type->isIntegerTy(32)) {
+        return ConstantInt::get(Type::getInt32Ty(context), 0, true);
+    }
+    if (type->isDoubleTy()) {
+        return ConstantFP::get(Type::getDoubleTy(context), 0);
+    }
+    if (type->isArrayTy()) {
+        return ConstantAggregateZero::get(type);
+    }
+    throw error<NoSuchTypeError>();
+}
+
 llvm::Type* Codegen::get_primitive_type(const PrimitiveTypeId& type_id)
 {
     if (type_id.name == "bool") {
@@ -767,45 +834,49 @@ llvm::Type* Codegen::get_primitive_type(const PrimitiveTypeId& type_id)
     if (type_id.name == "void") {
         return Type::getVoidTy(context);
     }
-    throw NoSuchTypeError{};
+    throw error<NoSuchTypeError>();
 }
 
 llvm::Type* Codegen::get_array_type(const ArrayTypeId& array_type_id)
 {
-    Type* elem_type = get_primitive_type(array_type_id.name);
+    Type* elem_type = get_primitive_type(array_type_id.primitive_type->name);
     Type* array_type = elem_type;
     for (int dim_size : boost::adaptors::reverse(array_type_id.dim_sizes)) {
         if (dim_size <= 0) {
-            throw NonPositiveDimSizeError{};
+            throw error<NonPositiveDimSizeError>();
         }
         array_type = ArrayType::get(array_type, dim_size);
     }
     return array_type;
 }
 
-llvm::Type* Codegen::get_type(StaticTypeId* type_id)
+llvm::Type* Codegen::get_type(const StaticTypeId* type_id)
 {
-    if (auto primitive_typeid = dynamic_cast<PrimitiveTypeId*>(type_id)) {
+    if (auto primitive_typeid = dynamic_cast<const PrimitiveTypeId*>(type_id)) {
         return get_primitive_type(*primitive_typeid);
     }
-    if (auto array_typeid = dynamic_cast<ArrayTypeId*>(type_id)) {
+    if (auto array_typeid =
+            dynamic_cast<const ArrayTypeId*>(type_id)) {
         return get_array_type(*array_typeid);
     }
     return nullptr;
 }
 
-llvm::Type* Codegen::type_check(StaticTypeId* type_id, Type* deduced)
+llvm::Type* Codegen::type_check(Type* expected, Type* got)
 {
-    if (dynamic_cast<EmptyTypeId*>(type_id)) {
+    if (expected != got) {
+        throw error<TypeError>(expected, got);
+    }
+    return expected;
+}
+
+llvm::Type* Codegen::type_check(const StaticTypeId* type_id, Type* deduced)
+{
+    if (!type_id) {
         return deduced;
     }
     Type* static_type = get_type(type_id);
-    if (static_type != deduced) {
-        static_type->dump();
-        deduced->dump();
-        throw TypeMismatchError{};
-    }
-    return static_type;
+    return type_check(static_type, deduced);
 }
 
 Type* Codegen::common_type(const std::vector<Value*>& values)
@@ -835,6 +906,7 @@ std::vector<Value*> Codegen::convert_numeric_to_float(std::vector<Value*> values
 
 llvm::Value* Codegen::generate(Node& node)
 {
+    current_node = &node;
     node.accept(*this);
     return latest_llvm_value;
 }
@@ -846,7 +918,6 @@ void Codegen::accept(Block& n)           { latest_llvm_value = generate(n); }
 void Codegen::accept(StaticTypeId& n)    { }
 void Codegen::accept(PrimitiveTypeId& n) { }
 void Codegen::accept(ArrayTypeId& n)     { }
-void Codegen::accept(EmptyTypeId& n)     { }
 void Codegen::accept(Definition& n)      { latest_llvm_value = generate(n); }
 void Codegen::accept(BinaryOperation& n) { latest_llvm_value = generate(n); }
 void Codegen::accept(UnaryOperation& n)  { latest_llvm_value = generate(n); }

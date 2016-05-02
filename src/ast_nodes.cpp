@@ -41,13 +41,22 @@ PrimitiveTypeId::PrimitiveTypeId(std::string name)
 {
 }
 
-ArrayTypeId::ArrayTypeId(std::string name, std::vector<int> dim_sizes)
-    : StaticTypeId{std::move(name)}, dim_sizes{std::move(dim_sizes)}
+std::string array_type_name(const std::string& primitive_type_name,
+                            const std::vector<int>& dim_sizes)
 {
+    std::string type_name = primitive_type_name;
+    for (int dim_size : dim_sizes) {
+        type_name += "[" + std::to_string(dim_size) + "]";
+    }
+    return type_name;
 }
 
-EmptyTypeId::EmptyTypeId()
-    : StaticTypeId{""}
+ArrayTypeId::ArrayTypeId(std::string primitive_type_name,
+                         std::vector<int> dim_sizes)
+    : StaticTypeId{array_type_name(primitive_type_name, dim_sizes)},
+      primitive_type{std::make_unique<PrimitiveTypeId>(
+                         std::move(primitive_type_name))},
+      dim_sizes{std::move(dim_sizes)}
 {
 }
 
@@ -176,7 +185,6 @@ void Block::accept(Visitor& v) { v.accept(*this); }
 void StaticTypeId::accept(Visitor& v) { v.accept(*this); }
 void PrimitiveTypeId::accept(Visitor& v) { v.accept(*this); }
 void ArrayTypeId::accept(Visitor& v) { v.accept(*this); }
-void EmptyTypeId::accept(Visitor& v) { v.accept(*this); }
 void Definition::accept(Visitor& v) { v.accept(*this); }
 void BinaryOperation::accept(Visitor& v) { v.accept(*this); }
 void UnaryOperation::accept(Visitor& v) { v.accept(*this); }

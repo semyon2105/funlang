@@ -9,12 +9,12 @@
 namespace Funlang
 {
 
-struct ParseError
+struct ParseError : std::exception
 {
     ParseError(Token at, size_t lineno);
 
     const Token at;
-    size_t lineno;
+    const size_t lineno;
 };
 
 struct UnexpectedTokenError : ParseError
@@ -125,7 +125,15 @@ private:
                                                         auto lvalue()
                                                             -> std::unique_ptr<AST::LValue>;
 
-
+    template<typename NodeT, typename... Args>
+    std::unique_ptr<NodeT> make_node(Args&&... args)
+    {
+        static_assert(std::is_base_of<AST::Node, NodeT>::value,
+                      "NodeT must be derived from AST::Node");
+        auto node = std::make_unique<NodeT>(std::forward<Args>(args)...);
+        node->lineno = lexer.line();
+        return node;
+    }
 };
 
 }

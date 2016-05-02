@@ -3,7 +3,6 @@
 #include <stack>
 
 #include "parse.h"
-#include "util.h"
 
 using namespace Funlang;
 using namespace Funlang::AST;
@@ -83,12 +82,12 @@ std::unique_ptr<LValue> Parser::lvalue()
             consume(']');
         }
 
-        return std::make_unique<ArrayAccess>(id->name, std::move(index_exprs));
+        return make_node<ArrayAccess>(id->name, std::move(index_exprs));
     }
     if (current_token->kind == Token::ID) {
         auto id_token = consume(Token::ID);
         Id* id = dynamic_cast<Id*>(id_token.get());
-        return std::make_unique<Variable>(id->name);
+        return make_node<Variable>(id->name);
     }
     return nullptr;
 }
@@ -98,24 +97,24 @@ std::unique_ptr<Literal> Parser::literal()
     if (current_token->kind == Token::INT) {
         auto integer_token = consume(Token::INT);
         Int* integer = dynamic_cast<Int*>(integer_token.get());
-        return std::make_unique<IntValue>(integer->value);
+        return make_node<IntValue>(integer->value);
     }
     if (current_token->kind == Token::FLOAT) {
         auto float_token = consume(Token::FLOAT);
         Float* fp_number = dynamic_cast<Float*>(float_token.get());
-        return std::make_unique<FloatValue>(fp_number->value);
+        return make_node<FloatValue>(fp_number->value);
     }
     if (current_token->kind == Token::TRUE) {
         consume(Token::TRUE);
-        return std::make_unique<BoolValue>(true);
+        return make_node<BoolValue>(true);
     }
     if (current_token->kind == Token::FALSE) {
         consume(Token::FALSE);
-        return std::make_unique<BoolValue>(false);
+        return make_node<BoolValue>(false);
     }
     if (current_token->kind == Token::NULLVAL) {
         consume(Token::NULLVAL);
-        return std::make_unique<NullValue>();
+        return make_node<NullValue>();
     }
     return nullptr;
 }
@@ -133,7 +132,7 @@ std::unique_ptr<ArrayExpr> Parser::array()
             consume(',');
         }
         consume(']');
-        return std::make_unique<ArrayExpr>(std::move(elements));
+        return make_node<ArrayExpr>(std::move(elements));
     }
     return nullptr;
 }
@@ -150,7 +149,7 @@ std::unique_ptr<FunctionCall> Parser::function_call()
     auto args = optargs();
     consume(')');
 
-    return std::make_unique<FunctionCall>(func_id->name, std::move(args));
+    return make_node<FunctionCall>(func_id->name, std::move(args));
 }
 
 std::unique_ptr<WhileExpr> Parser::while_expr()
@@ -164,7 +163,7 @@ std::unique_ptr<WhileExpr> Parser::while_expr()
 
     auto body = block();
 
-    return std::make_unique<WhileExpr>(std::move(condition), std::move(body));
+    return make_node<WhileExpr>(std::move(condition), std::move(body));
 }
 
 std::unique_ptr<Expression> Parser::else_tail()
@@ -188,13 +187,13 @@ std::unique_ptr<Expression> Parser::if_else_expr()
     auto if_body = block();
 
     if (current_token->kind != Token::ELSE) {
-        return std::make_unique<IfElseExpr>(std::move(condition), std::move(if_body));
+        return make_node<IfElseExpr>(std::move(condition), std::move(if_body));
     }
 
     consume(Token::ELSE);
     auto else_body = else_tail();
 
-    return std::make_unique<IfElseExpr>(
+    return make_node<IfElseExpr>(
                 std::move(condition),
                 std::move(if_body),
                 std::move(else_body));
@@ -211,19 +210,21 @@ std::unique_ptr<Definition> Parser::definition()
     Id* id = dynamic_cast<Id*>(id_token.get());
 
     std::unique_ptr<StaticTypeId> type = nullptr;
-    if (current_token->kind == ':') {
+    if (current_token->kind == ':' && lookahead(1)->kind == Token::ID) {
         consume(':');
         type = static_type();
     }
 
-    consume('=');
+    std::unique_ptr<Expression> rhs = nullptr;
+    if (current_token->kind == '=') {
+        consume('=');
+        rhs = expression();
+    }
 
-    auto rhs = expression();
-
-    return std::make_unique<Definition>(
+    return make_node<Definition>(
             std::move(id->name),
-            type ? std::move(type) : std::make_unique<EmptyTypeId>(),
-            std::move(rhs)
+            type ? std::move(type) : nullptr,
+            rhs ? std::move(rhs) : nullptr
     );
 }
 
@@ -231,12 +232,12 @@ std::unique_ptr<Expression> Parser::primary()
 {
     if (current_token->kind == '-') {
         consume('-');
-        return std::make_unique<UnaryOperation>(
+        return make_node<UnaryOperation>(
                     UnaryOperation::Kind::Minus, primary());
     }
     if (current_token->kind == '!') {
         consume('!');
-        return std::make_unique<UnaryOperation>(
+        return make_node<UnaryOperation>(
                     UnaryOperation::Kind::Not, primary());
     }
     if (current_token->kind == '(') {
@@ -267,7 +268,7 @@ std::unique_ptr<Expression> Parser::muldiv()
         auto op_token = consume(muldiv_op);
         auto kind = BinaryOperation::from_token_kind(op_token->kind);
         auto rhs = muldiv();
-        return std::make_unique<BinaryOperation>(
+        return make_node<BinaryOperation>(
                 std::move(lhs), kind, std::move(rhs)
         );
     }
@@ -284,7 +285,7 @@ std::unique_ptr<Expression> Parser::addsub()
         auto op_token = consume(addsub_op);
         auto kind = BinaryOperation::from_token_kind(op_token->kind);
         auto rhs = addsub();
-        return std::make_unique<BinaryOperation>(
+        return make_node<BinaryOperation>(
                 std::move(lhs), kind, std::move(rhs)
         );
     }
@@ -303,7 +304,7 @@ std::unique_ptr<Expression> Parser::conditional()
         auto op_token = consume(cond_op);
         auto kind = BinaryOperation::from_token_kind(op_token->kind);
         auto rhs = conditional();
-        return std::make_unique<BinaryOperation>(
+        return make_node<BinaryOperation>(
                     std::move(lhs), kind, std::move(rhs)
         );
     }
@@ -321,7 +322,7 @@ std::unique_ptr<Expression> Parser::eq_neq()
         auto op_token = consume(eq_neq_op);
         auto kind = BinaryOperation::from_token_kind(op_token->kind);
         auto rhs = eq_neq();
-        return std::make_unique<BinaryOperation>(
+        return make_node<BinaryOperation>(
                     std::move(lhs), kind, std::move(rhs)
         );
     }
@@ -339,7 +340,7 @@ std::unique_ptr<Expression> Parser::and_op()
         auto op_token = consume(andop);
         auto kind = BinaryOperation::from_token_kind(op_token->kind);
         auto rhs = and_op();
-        return std::make_unique<BinaryOperation>(
+        return make_node<BinaryOperation>(
                     std::move(lhs), kind, std::move(rhs)
         );
     }
@@ -357,7 +358,7 @@ std::unique_ptr<Expression> Parser::or_op()
         auto op_token = consume(orop);
         auto kind = BinaryOperation::from_token_kind(op_token->kind);
         auto rhs = or_op();
-        return std::make_unique<BinaryOperation>(
+        return make_node<BinaryOperation>(
                     std::move(lhs), kind, std::move(rhs)
         );
     }
@@ -383,14 +384,17 @@ std::vector<std::unique_ptr<Expression>> Parser::optargs()
 std::unique_ptr<Expression> Parser::assignment()
 {
     auto lhs = or_op();
-    if (auto lvalue = dynamic_cast<LValue*>(lhs.get())
-        && current_token->kind == '=')
-    {
-        auto op_token = consume('=');
-        auto kind = BinaryOperation::from_token_kind(op_token->kind);
-        auto rhs = assignment();
-        return std::make_unique<BinaryOperation>(
-                    std::move(lhs), kind, std::move(rhs));
+    if (current_token->kind == '=') {
+        if (auto lvalue = dynamic_cast<LValue*>(lhs.get())) {
+            auto op_token = consume('=');
+            auto kind = BinaryOperation::from_token_kind(op_token->kind);
+            auto rhs = assignment();
+            return make_node<BinaryOperation>(
+                        std::move(lhs), kind, std::move(rhs));
+        }
+        else {
+            throw LValueExpected{*current_token, lexer.line()};
+        }
     }
     return lhs;
 }
@@ -410,7 +414,7 @@ std::vector<std::unique_ptr<Expression>> Parser::optexprs()
     std::unique_ptr<Expression> expr = expression();
 
     if (!expr) {
-        exprs.push_back(std::make_unique<BlankExpr>());
+        exprs.push_back(make_node<BlankExpr>());
         return exprs;
     }
 
@@ -425,7 +429,7 @@ std::vector<std::unique_ptr<Expression>> Parser::optexprs()
         expr = expression();
 
         if (!expr) {
-            exprs.push_back(std::make_unique<BlankExpr>());
+            exprs.push_back(make_node<BlankExpr>());
             break;
         }
     }
@@ -439,7 +443,7 @@ std::unique_ptr<StaticTypeId> Parser::static_type()
         auto id_token = consume(Token::ID);
         Id* id = dynamic_cast<Id*>(id_token.get());
         if (current_token->kind != '[') {
-            return std::make_unique<PrimitiveTypeId>(id->name);
+            return make_node<PrimitiveTypeId>(id->name);
         }
 
         std::vector<int> dim_sizes;
@@ -450,7 +454,7 @@ std::unique_ptr<StaticTypeId> Parser::static_type()
             consume(']');
             dim_sizes.push_back(integer->value);
         }
-        return std::make_unique<ArrayTypeId>(id->name, dim_sizes);
+        return make_node<ArrayTypeId>(id->name, dim_sizes);
     }
     return nullptr;
 }
@@ -461,7 +465,7 @@ std::unique_ptr<Block> Parser::block()
         consume('{');
         auto exprs = optexprs();
         consume('}');
-        return std::make_unique<Block>(std::move(exprs));
+        return make_node<Block>(std::move(exprs));
     }
     return nullptr;
 }
@@ -479,7 +483,7 @@ std::unique_ptr<Parameter> Parser::parameter(bool is_optional)
 
     auto type = static_type();
 
-    return std::make_unique<Parameter>(param_name, std::move(type));
+    return make_node<Parameter>(param_name, std::move(type));
 }
 
 std::vector<std::unique_ptr<Parameter>> Parser::optparams()
@@ -530,7 +534,7 @@ std::unique_ptr<Function> Parser::function()
 
     auto body = block();
 
-    return std::make_unique<Function>(
+    return make_node<Function>(
             func_id->name,
             std::move(params),
             std::move(type),
@@ -551,10 +555,26 @@ std::vector<std::unique_ptr<Function>> Parser::functions()
 
 std::unique_ptr<Program> Parser::program()
 {
-    return std::make_unique<Program>(functions());
+    return make_node<Program>(functions());
 }
 
 std::unique_ptr<Program> Parser::parse_all()
 {
-    return program();
+    try {
+        return program();
+    }
+    catch (const LValueExpected& error) {
+        std::cout << "Error: lvalue expected at line " << error.lineno
+                  << ", before token: " << error.at << '\n';
+    }
+    catch (const UnexpectedTokenError& error) {
+        std::cout << "Error: Unexpected token at line " << error.lineno << '\n'
+                  << "\texpected: " << Token::kind_to_string(error.expected)
+                  << "\n\tgot: " << error.at << '\n';
+    }
+    catch (const ParseError& error) {
+        std::cout << "Error: Parse error at line " << error.lineno
+                  << ", at token: " << error.at << '\n';
+    }
+    std::terminate();
 }

@@ -22,7 +22,6 @@ struct Block;
 struct StaticTypeId;
 struct PrimitiveTypeId;
 struct ArrayTypeId;
-struct EmptyTypeId;
 struct Definition;
 struct BinaryOperation;
 struct UnaryOperation;
@@ -49,7 +48,6 @@ struct Visitor
     virtual void accept(StaticTypeId&) = 0;
     virtual void accept(PrimitiveTypeId&) = 0;
     virtual void accept(ArrayTypeId&) = 0;
-    virtual void accept(EmptyTypeId&) = 0;
     virtual void accept(Definition&) = 0;
     virtual void accept(BinaryOperation&) = 0;
     virtual void accept(UnaryOperation&) = 0;
@@ -68,6 +66,8 @@ struct Visitor
 
 struct Node
 {
+    size_t lineno = 0;
+
     virtual void accept(Visitor&) = 0;
 };
 
@@ -134,16 +134,10 @@ struct PrimitiveTypeId : StaticTypeId
 
 struct ArrayTypeId : StaticTypeId
 {
-    ArrayTypeId(std::string name, std::vector<int> dim);
+    ArrayTypeId(std::string primitive_type_name, std::vector<int> dim);
 
+    std::unique_ptr<PrimitiveTypeId> primitive_type;
     const std::vector<int> dim_sizes;
-
-    void accept(Visitor&) override;
-};
-
-struct EmptyTypeId : StaticTypeId
-{
-    EmptyTypeId();
 
     void accept(Visitor&) override;
 };

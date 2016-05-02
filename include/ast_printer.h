@@ -1,6 +1,8 @@
 #ifndef FUNLANG_AST_PRINTER_H
 #define FUNLANG_AST_PRINTER_H
 
+#include <boost/core/demangle.hpp>
+
 #include "ast_nodes.h"
 
 namespace Funlang
@@ -9,11 +11,10 @@ namespace Funlang
 namespace AST
 {
 
+std::string demangle(const std::type_info&);
+
 void print(Node& tree);
 void print(std::ostream& os, Node& tree);
-
-namespace Codegen
-{
 
 class PrinterVisitor : public Visitor
 {
@@ -27,7 +28,6 @@ public:
     void accept(StaticTypeId&) override;
     void accept(PrimitiveTypeId&) override;
     void accept(ArrayTypeId&) override;
-    void accept(EmptyTypeId&) override;
     void accept(Definition&) override;
     void accept(BinaryOperation&) override;
     void accept(UnaryOperation&) override;
@@ -51,8 +51,6 @@ private:
 
     void print(const std::string& s);
 };
-
-}
 
 }
 

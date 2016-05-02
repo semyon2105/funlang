@@ -39,6 +39,23 @@ private:
     std::vector<std::unordered_map<std::string, llvm::Value*>> tables;
 };
 
+struct CodegenError;
+
+//struct UndefinedVariableError;
+struct TypeError;
+struct UnreachableCodeError;
+struct InvalidExpressionError;
+struct UndefinedReferenceError;
+struct IncorrectNumberOfArgumentsError;
+struct FunctionAlreadyDefinedError;
+struct TypeMismatchError;
+struct NoSuchTypeError;
+struct InvalidBinaryOperationError;
+struct MainFunctionNotDefinedError;
+struct NonPositiveDimSizeError;
+struct ZeroLengthArrayError;
+struct UnspecifiedTypeError;
+
 class Codegen : private Visitor
 {
 public:
@@ -54,6 +71,8 @@ private:
     llvm::Module module;
     llvm::IRBuilder<> builder;
     ScopedSymbolTable variables;
+
+    Node* current_node = nullptr;
 
     llvm::Value* generate(const Program&);
 
@@ -97,14 +116,29 @@ private:
 
     std::vector<llvm::Value*> convert_numeric_to_float(std::vector<llvm::Value*>);
 
-    llvm::AllocaInst* create_entry_block_alloca(llvm::Function*, llvm::Type*,
-                                                const std::string&);
+    llvm::AllocaInst* create_entry_block_alloca(
+            llvm::Function*, llvm::Type*, const std::string&);
+
+    llvm::Value* default_initialize(const StaticTypeId*);
 
     llvm::Type* get_primitive_type(const PrimitiveTypeId&);
     llvm::Type* get_array_type(const ArrayTypeId&);
-    llvm::Type* get_type(StaticTypeId*);
+    llvm::Type* get_type(const StaticTypeId*);
 
-    llvm::Type* type_check(StaticTypeId*, llvm::Type*);
+    llvm::Type* type_check(llvm::Type*, llvm::Type*);
+    llvm::Type* type_check(const StaticTypeId*, llvm::Type*);
+
+    template<typename ErrorT, typename... Args>
+    ErrorT error(Args&&... args)
+    {
+        static_assert(std::is_base_of<CodegenError, ErrorT>::value,
+                      "ErrorT must be derived from AST::impl::CodegenError");
+        auto error = ErrorT{std::forward<Args>(args)...};
+        if (current_node) {
+            error.node = current_node;
+        }
+        return error;
+    }
 
     void accept(Program&) override;
     void accept(Function&) override;
@@ -113,7 +147,6 @@ private:
     void accept(StaticTypeId&) override;
     void accept(PrimitiveTypeId&) override;
     void accept(ArrayTypeId&) override;
-    void accept(EmptyTypeId&) override;
     void accept(Definition&) override;
     void accept(BinaryOperation&) override;
     void accept(UnaryOperation&) override;

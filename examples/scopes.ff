@@ -1,0 +1,27 @@
+function other(i:int) : void
+{
+    print_int(i);
+    let i = 123;
+    print_int(i);
+}
+
+function main() : void
+{
+    let i = 0;
+    other(i);
+    {
+        let i = 10;
+        other(i);
+    };
+    other(i);
+    {
+        let i = 20;
+        other(i);
+        {
+            let i = 200;
+            other(i);
+        };
+        other(i);
+    };
+    other(i);
+}

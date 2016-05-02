@@ -1,0 +1,20 @@
+function main() : void
+{
+    let i : int;
+    let ai : int[5];
+    let f : float;
+    let fi : float[5];
+
+    print_int(i);
+    while i != 5 {
+        print_int(ai[i]);
+        i = i + 1;
+    };
+
+    print_float(f);
+    i = 0;
+    while i != 5 {
+        print_float(fi[i]);
+        i = i + 1;
+    };
+}

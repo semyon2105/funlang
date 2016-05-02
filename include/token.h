@@ -86,7 +86,7 @@ public:
 
     virtual std::string to_string() const
     {
-        return "<" + kind_to_string(kind) + ">";
+        return kind_to_string(kind);
     }
 };
 

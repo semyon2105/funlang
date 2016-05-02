@@ -1,15 +1,13 @@
-﻿#include <boost/core/demangle.hpp>
-
-#include "ast_printer.h"
+﻿#include "ast_printer.h"
 
 using namespace Funlang;
 using namespace Funlang::AST;
-using namespace Funlang::AST::Codegen;
 
-template <typename T>
-std::string type_name(const T& t)
+std::string AST::demangle(const std::type_info& t)
 {
-    return boost::core::demangle(typeid(t).name());
+    std::string demangled = boost::core::demangle(t.name());
+    size_t pos = demangled.find_last_of(':');
+    return demangled.substr(pos + 1);
 }
 
 void AST::print(Node& tree)
@@ -46,7 +44,7 @@ void PrinterVisitor::print(const std::string& s)
 
 void PrinterVisitor::accept(Program& p)
 {
-    print(type_name(p));
+    print(demangle(typeid(p)));
     auto level_guard = LevelGuard{level};
     for (const auto& f : p.functions) {
         f->accept(*this);
@@ -55,7 +53,7 @@ void PrinterVisitor::accept(Program& p)
 
 void PrinterVisitor::accept(Function& f)
 {
-    print(std::string{type_name(f)});
+    print(demangle(typeid(f)));
     auto level_guard = LevelGuard{level};
     print("name=" + f.name);
     print("[Parameters]");
@@ -73,7 +71,7 @@ void PrinterVisitor::accept(Function& f)
 
 void PrinterVisitor::accept(Parameter& p)
 {
-    print(std::string{type_name(p)});
+    print(demangle(typeid(p)));
     auto level_guard = LevelGuard{level};
     print("name=" + p.name);
     print("[Type]");
@@ -82,7 +80,7 @@ void PrinterVisitor::accept(Parameter& p)
 
 void PrinterVisitor::accept(Block& b)
 {
-    print(std::string{type_name(b)});
+    print(demangle(typeid(b)));
     auto level_guard = LevelGuard{level};
     for (const auto& e : b.exprs) {
         e->accept(*this);
@@ -91,48 +89,43 @@ void PrinterVisitor::accept(Block& b)
 
 void PrinterVisitor::accept(StaticTypeId& t)
 {
-    print(std::string{type_name(t)});
+    print(demangle(typeid(t)));
     auto level_guard = LevelGuard{level};
     print("name=" + t.name);
 }
 
 void PrinterVisitor::accept(PrimitiveTypeId& t)
 {
-    print(std::string{type_name(t)});
+    print(demangle(typeid(t)));
     auto level_guard = LevelGuard{level};
     print("name=" + t.name);
 }
 
 void PrinterVisitor::accept(ArrayTypeId& t)
 {
-    print(std::string{type_name(t)});
+    print(demangle(typeid(t)));
     auto level_guard = LevelGuard{level};
-    std::string dim_sizes;
-    for (int size : t.dim_sizes) {
-        dim_sizes += "[" + std::to_string(size) + "]";
-    }
-    print("name=" + t.name + dim_sizes);
-}
-
-void PrinterVisitor::accept(EmptyTypeId& t)
-{
-    print(std::string{type_name(t)});
+    print("name=" + t.name);
 }
 
 void PrinterVisitor::accept(Definition& d)
 {
-    print(std::string{type_name(d)});
+    print(demangle(typeid(d)));
     auto level_guard = LevelGuard{level};
     print("name=" + d.name);
-    print("[Type]");
-    d.type->accept(*this);
-    print("[RValue]");
-    d.rhs->accept(*this);
+    if (d.type) {
+        print("[Type]");
+        d.type->accept(*this);
+    }
+    if (d.rhs) {
+        print("[RHS]");
+        d.rhs->accept(*this);
+    }
 }
 
 void PrinterVisitor::accept(BinaryOperation& b)
 {
-    print(std::string{type_name(b)});
+    print(demangle(typeid(b)));
     auto level_guard = LevelGuard{level};
     print("kind=" + BinaryOperation::kind_strings.at(b.kind));
     print("[LHS]");
@@ -143,7 +136,7 @@ void PrinterVisitor::accept(BinaryOperation& b)
 
 void PrinterVisitor::accept(UnaryOperation& u)
 {
-    print(std::string{type_name(u)});
+    print(demangle(typeid(u)));
     auto level_guard = LevelGuard{level};
     print(std::string{"kind="} + u.kind_strings.at(u.kind));
     print("[Operand]");
@@ -152,7 +145,7 @@ void PrinterVisitor::accept(UnaryOperation& u)
 
 void PrinterVisitor::accept(IfElseExpr& i)
 {
-    print(std::string{type_name(i)});
+    print(demangle(typeid(i)));
     auto level_guard = LevelGuard{level};
     print("[Condition]");
     i.condition->accept(*this);
@@ -166,7 +159,7 @@ void PrinterVisitor::accept(IfElseExpr& i)
 
 void PrinterVisitor::accept(WhileExpr& w)
 {
-    print(std::string{type_name(w)});
+    print(demangle(typeid(w)));
     auto level_guard = LevelGuard{level};
     print("[Condition]");
     w.condition->accept(*this);
@@ -176,7 +169,7 @@ void PrinterVisitor::accept(WhileExpr& w)
 
 void PrinterVisitor::accept(FunctionCall& f)
 {
-    print(std::string{type_name(f)});
+    print(demangle(typeid(f)));
     auto level_guard = LevelGuard{level};
     print(std::string{"name="} + f.callee_name);
     print("[Arguments]");
@@ -187,14 +180,14 @@ void PrinterVisitor::accept(FunctionCall& f)
 
 void PrinterVisitor::accept(Variable& v)
 {
-    print(std::string{type_name(v)});
+    print(demangle(typeid(v)));
     auto level_guard = LevelGuard{level};
     print("name=" + v.name);
 }
 
 void PrinterVisitor::accept(ArrayAccess& a)
 {
-    print(std::string{type_name(a)});
+    print(demangle(typeid(a)));
     auto level_guard = LevelGuard{level};
     print("name=" + a.name);
     print("[IndexExpressions]");
@@ -205,28 +198,28 @@ void PrinterVisitor::accept(ArrayAccess& a)
 
 void PrinterVisitor::accept(BoolValue& v)
 {
-    print(std::string{type_name(v)});
+    print(demangle(typeid(v)));
     auto level_guard = LevelGuard{level};
     print("value=" + std::to_string(v.value));
 }
 
 void PrinterVisitor::accept(IntValue& v)
 {
-    print(std::string{type_name(v)});
+    print(demangle(typeid(v)));
     auto level_guard = LevelGuard{level};
     print("value=" + std::to_string(v.value));
 }
 
 void PrinterVisitor::accept(FloatValue& v)
 {
-    print(std::string{type_name(v)});
+    print(demangle(typeid(v)));
     auto level_guard = LevelGuard{level};
     print("value=" + std::to_string(v.value));
 }
 
 void PrinterVisitor::accept(ArrayExpr& arr)
 {
-    print(std::string{type_name(arr)});
+    print(demangle(typeid(arr)));
     auto level_guard = LevelGuard{level};
     print("[Elements]");
     for (const auto& elem : arr.elements) {
@@ -237,10 +230,10 @@ void PrinterVisitor::accept(ArrayExpr& arr)
 
 void PrinterVisitor::accept(NullValue& v)
 {
-    print(std::string{type_name(v)});
+    print(demangle(typeid(v)));
 }
 
 void PrinterVisitor::accept(BlankExpr& b)
 {
-    print(std::string{type_name(b)});
+    print(demangle(typeid(b)));
 }

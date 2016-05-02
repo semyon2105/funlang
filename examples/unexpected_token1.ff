@@ -1,0 +1,4 @@
+function main() : void
+{
+    let v : 123 = 321;
+}

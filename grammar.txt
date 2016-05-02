@@ -40,7 +40,7 @@ primary ::=
     | literal
     | lvalue
 
-def ::= 'let' <id> (':' typeid)? '=' expr
+def ::= 'let' <id> (':' typeid)? ('=' expr)?
 
 if_else ::= 'if' expr block ('else' else_tail)?
 
