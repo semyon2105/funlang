@@ -260,53 +260,65 @@ std::unique_ptr<Expression> Parser::primary()
 }
 
 std::unique_ptr<Expression> Parser::muldiv()
-{
+{   
     auto lhs = primary();
 
-    Token::Kind muldiv_op = current_token->kind;
-    if (muldiv_op == '*' || muldiv_op == '/') {
-        auto op_token = consume(muldiv_op);
-        auto kind = BinaryOperation::from_token_kind(op_token->kind);
-        auto rhs = muldiv();
-        return make_node<BinaryOperation>(
-                std::move(lhs), kind, std::move(rhs)
-        );
+    while (true) {
+        Token::Kind muldiv_op = current_token->kind;
+        if (muldiv_op == '*' || muldiv_op == '/') {
+            auto op_token = consume(muldiv_op);
+            auto kind = BinaryOperation::from_token_kind(op_token->kind);
+            auto rhs = primary();
+            lhs = make_node<BinaryOperation>(
+                        std::move(lhs), kind, std::move(rhs));
+        }
+        else {
+            break;
+        }
     }
 
     return lhs;
 }
 
 std::unique_ptr<Expression> Parser::addsub()
-{
+{   
     auto lhs = muldiv();
 
-    Token::Kind addsub_op = current_token->kind;
-    if (addsub_op == '+' || addsub_op == '-') {
-        auto op_token = consume(addsub_op);
-        auto kind = BinaryOperation::from_token_kind(op_token->kind);
-        auto rhs = addsub();
-        return make_node<BinaryOperation>(
-                std::move(lhs), kind, std::move(rhs)
-        );
+    while (true) {
+        Token::Kind addsub_op = current_token->kind;
+        if (addsub_op == '+' || addsub_op == '-') {
+            auto op_token = consume(addsub_op);
+            auto kind = BinaryOperation::from_token_kind(op_token->kind);
+            auto rhs = muldiv();
+            lhs = make_node<BinaryOperation>(
+                        std::move(lhs), kind, std::move(rhs));
+        }
+        else {
+            break;
+        }
     }
 
     return lhs;
 }
 
 std::unique_ptr<Expression> Parser::conditional()
-{
+{   
     auto lhs = addsub();
 
-    Token::Kind cond_op = current_token->kind;
-    if (cond_op == '<' || cond_op == '>' ||
-        cond_op == Token::LE || cond_op == Token::GE)
-    {
-        auto op_token = consume(cond_op);
-        auto kind = BinaryOperation::from_token_kind(op_token->kind);
-        auto rhs = conditional();
-        return make_node<BinaryOperation>(
-                    std::move(lhs), kind, std::move(rhs)
-        );
+    while (true) {
+        Token::Kind cond_op = current_token->kind;
+        if (cond_op == '<' || cond_op == '>' ||
+            cond_op == Token::LE || cond_op == Token::GE)
+        {
+            auto op_token = consume(cond_op);
+            auto kind = BinaryOperation::from_token_kind(op_token->kind);
+            auto rhs = addsub();
+            lhs = make_node<BinaryOperation>(
+                        std::move(lhs), kind, std::move(rhs));
+        }
+        else {
+            break;
+        }
     }
 
     return lhs;
@@ -316,17 +328,19 @@ std::unique_ptr<Expression> Parser::eq_neq()
 {
     auto lhs = conditional();
 
-    Token::Kind eq_neq_op = current_token->kind;
-    if (eq_neq_op == Token::EQ || eq_neq_op == Token::NEQ)
-    {
-        auto op_token = consume(eq_neq_op);
-        auto kind = BinaryOperation::from_token_kind(op_token->kind);
-        auto rhs = eq_neq();
-        return make_node<BinaryOperation>(
-                    std::move(lhs), kind, std::move(rhs)
-        );
+    while (true) {
+        Token::Kind eq_neq_op = current_token->kind;
+        if (eq_neq_op == Token::EQ || eq_neq_op == Token::NEQ) {
+            auto op_token = consume(eq_neq_op);
+            auto kind = BinaryOperation::from_token_kind(op_token->kind);
+            auto rhs = conditional();
+            lhs = make_node<BinaryOperation>(
+                        std::move(lhs), kind, std::move(rhs));
+        }
+        else {
+            break;
+        }
     }
-
     return lhs;
 }
 
@@ -334,15 +348,18 @@ std::unique_ptr<Expression> Parser::and_op()
 {
     auto lhs = eq_neq();
 
-    Token::Kind andop = current_token->kind;
-    if (andop == Token::AND)
-    {
-        auto op_token = consume(andop);
-        auto kind = BinaryOperation::from_token_kind(op_token->kind);
-        auto rhs = and_op();
-        return make_node<BinaryOperation>(
-                    std::move(lhs), kind, std::move(rhs)
-        );
+    while (true) {
+        Token::Kind andop = current_token->kind;
+        if (andop == Token::AND) {
+            auto op_token = consume(andop);
+            auto kind = BinaryOperation::from_token_kind(op_token->kind);
+            auto rhs = eq_neq();
+            lhs = make_node<BinaryOperation>(
+                        std::move(lhs), kind, std::move(rhs));
+        }
+        else {
+            break;
+        }
     }
 
     return lhs;
@@ -352,17 +369,19 @@ std::unique_ptr<Expression> Parser::or_op()
 {
     auto lhs = and_op();
 
-    Token::Kind orop = current_token->kind;
-    if (orop == Token::OR)
-    {
-        auto op_token = consume(orop);
-        auto kind = BinaryOperation::from_token_kind(op_token->kind);
-        auto rhs = or_op();
-        return make_node<BinaryOperation>(
-                    std::move(lhs), kind, std::move(rhs)
-        );
+    while (true) {
+        Token::Kind orop = current_token->kind;
+        if (orop == Token::OR) {
+            auto op_token = consume(orop);
+            auto kind = BinaryOperation::from_token_kind(op_token->kind);
+            auto rhs = and_op();
+            lhs = make_node<BinaryOperation>(
+                        std::move(lhs), kind, std::move(rhs));
+        }
+        else {
+            break;
+        }
     }
-
     return lhs;
 }
 

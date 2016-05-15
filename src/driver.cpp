@@ -13,13 +13,13 @@ int main(int argc, char* argv[])
     }
 
     std::string input_path = argv[1];
-    size_t name_pos = input_path.find_last_of('/');
+    size_t name_pos = input_path.find_last_of('/') + 1;
     if (name_pos == std::string::npos) {
         name_pos = 0;
     }
     size_t ext_pos = input_path.rfind(".ff");
     std::string output_filename =
-            input_path.substr(name_pos + 1, ext_pos - name_pos - 1) + ".ll";
+            input_path.substr(name_pos, ext_pos - name_pos) + ".ll";
 
     std::ifstream input_file { input_path };
     std::ofstream output_file { output_filename };
