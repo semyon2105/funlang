@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED on)
 
 find_package(Boost 1.56.0 REQUIRED)
-find_package(LLVM 3.8 REQUIRED)
+find_package(LLVM 3.8.0 REQUIRED)
 
 include_directories(include ${Boost_INCLUDE_DIRS} ${LLVM_INCLUDE_DIRS})
 

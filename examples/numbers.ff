@@ -1,0 +1,13 @@
+function main() : void {
+    let a = 0;
+    let b = 00012345;
+    let c = -42;
+    let d = -0987;
+    print_int(a); print_int(b); print_int(c); print_int(d);
+
+    let fa = 000.000;
+    let fb = .00012345;
+    let fc = -42.;
+    let fd = -.0987;
+    print_float(fa); print_float(fb); print_float(fc); print_float(fd);
+}

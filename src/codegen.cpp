@@ -39,6 +39,7 @@ struct impl::IncorrectNumberOfArgumentsError  : CodegenError {};
 struct impl::FunctionAlreadyDefinedError      : CodegenError {};
 struct impl::NoSuchTypeError                  : CodegenError {};
 struct impl::InvalidBinaryOperationError      : CodegenError {};
+struct impl::InvalidUnaryOperationError       : CodegenError {};
 struct impl::MainFunctionNotDefinedError      : CodegenError {};
 struct impl::NonPositiveDimSizeError          : CodegenError {};
 struct impl::ZeroLengthArrayError             : CodegenError {};
@@ -439,11 +440,22 @@ Value* Codegen::generate(const UnaryOperation& u)
     if (!expr) {
         throw error<CodegenError>();
     }
+    Type* type = expr->getType();
     if (u.kind == UnaryOperation::Kind::Minus) {
-        expr = builder.CreateNeg(expr, "negtmp", false, false);
+        if (type->isIntegerTy(32)) {
+            expr = builder.CreateNeg(expr, "inegtmp", false, false);
+        } else if (type->isDoubleTy()) {
+            expr = builder.CreateFNeg(expr, "fnegtmp");
+        } else {
+            throw error<InvalidUnaryOperationError>();
+        }
     }
     else if (u.kind == UnaryOperation::Kind::Not) {
-        expr = builder.CreateNot(expr, "nottmp");
+        if (type->isIntegerTy(1)) {
+            expr = builder.CreateNot(expr, "nottmp");
+        } else {
+            throw error<InvalidUnaryOperationError>();
+        }
     }
     else {
         throw error<CodegenError>();

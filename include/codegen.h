@@ -51,6 +51,7 @@ struct FunctionAlreadyDefinedError;
 struct TypeMismatchError;
 struct NoSuchTypeError;
 struct InvalidBinaryOperationError;
+struct InvalidUnaryOperationError;
 struct MainFunctionNotDefinedError;
 struct NonPositiveDimSizeError;
 struct ZeroLengthArrayError;
