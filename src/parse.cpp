@@ -247,7 +247,8 @@ std::unique_ptr<Expression> Parser::primary()
         return expr;
     }
     std::unique_ptr<Expression> prim;
-    if ((prim = definition()) ||
+    if ((prim = block()) ||
+        (prim = definition()) ||
         (prim = if_else_expr()) ||
         (prim = while_expr()) ||
         (prim = function_call()) ||
@@ -420,11 +421,7 @@ std::unique_ptr<Expression> Parser::assignment()
 
 std::unique_ptr<Expression> Parser::expression()
 {
-    std::unique_ptr<Expression> expr;
-    if ((expr = block()) || (expr = assignment())) {
-        return expr;
-    }
-    return nullptr;
+    return assignment();
 }
 
 std::vector<std::unique_ptr<Expression>> Parser::optexprs()

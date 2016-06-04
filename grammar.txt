@@ -4,13 +4,13 @@ function ::= 'function' <id> '(' params? ')' ':' typeid block
 
 params ::= <id> ':' typeid (',' params)*
 
-expr ::= block | assign
+typeid ::= <id> ('[' <integer> ']')*
 
 block ::= '{' exprs? '}'
 
 exprs ::= expr (';' exprs)*
 
-typeid ::= <id> ('[' <integer> ']')*
+expr ::= assign
 
 assign ::=
       lvalue ('=' assign)?
@@ -32,6 +32,7 @@ primary ::=
       '-' primary
     | '!' primary
     | '(' expr ')'
+    | block
     | def
     | if_else
     | while
