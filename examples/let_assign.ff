@@ -1,0 +1,5 @@
+function main() : void {
+  let a = let b = 123;
+  a = b = a + b;
+  print_int(a); print_int(b);
+}

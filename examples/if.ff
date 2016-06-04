@@ -1,0 +1,4 @@
+function main() : void {
+    let i : int = if 1 > 2 { 10 };
+    print_int(i);
+}

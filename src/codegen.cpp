@@ -31,7 +31,7 @@ struct impl::TypeError : CodegenError
     const llvm::Type* expected;
     const llvm::Type* got;
 };
-
+struct impl::VoidValueError                   : CodegenError {};
 struct impl::UnreachableCodeError             : CodegenError {};
 struct impl::InvalidExpressionError           : CodegenError {};
 struct impl::UndefinedReferenceError          : CodegenError {};
@@ -401,7 +401,7 @@ Value* Codegen::generate(const Definition& d)
     if (d.rhs) {
         rhs = rvalue(generate(*d.rhs));
         if (!rhs) {
-            throw error<CodegenError>();
+            throw error<VoidValueError>();
         }
     }
     else {
@@ -424,7 +424,7 @@ Value* Codegen::generate(const BinaryOperation& b)
     Value* lhs = generate(*b.lhs);
     Value* rhs = generate(*b.rhs);
     if (!lhs || !rhs) {
-        throw error<CodegenError>();
+        throw error<VoidValueError>();
     }
 
     Value* binop = match_binop(b.kind, lhs, rhs);
@@ -438,7 +438,7 @@ Value* Codegen::generate(const UnaryOperation& u)
 {
     Value* expr = rvalue(generate(*u.expr));
     if (!expr) {
-        throw error<CodegenError>();
+        throw error<VoidValueError>();
     }
     Type* type = expr->getType();
     if (u.kind == UnaryOperation::Kind::Minus) {
@@ -501,7 +501,7 @@ Value* Codegen::generate(const IfElseExpr& i)
     else {
         func->getBasicBlockList().push_back(after_ifelse_bb);
         builder.SetInsertPoint(after_ifelse_bb);
-        return if_br;
+        return nullptr;
     }
 
     func->getBasicBlockList().push_back(after_ifelse_bb);
@@ -631,7 +631,7 @@ Value* Codegen::generate(const ArrayExpr& arr)
 
 Value* Codegen::generate(const NullValue&)
 {
-    return Constant::getNullValue(Type::getVoidTy(context));
+    return nullptr;
 }
 
 Value* Codegen::generate(const BlankExpr&)

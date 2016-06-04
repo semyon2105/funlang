@@ -41,7 +41,7 @@ private:
 
 struct CodegenError;
 
-//struct UndefinedVariableError;
+struct VoidValueError;
 struct TypeError;
 struct UnreachableCodeError;
 struct InvalidExpressionError;
