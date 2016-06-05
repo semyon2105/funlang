@@ -1,0 +1,7 @@
+function main() : void {
+    let a = [1, 2, 3];
+    a[0] = a[0] + 10;
+    print_int(a[0]);
+    a = [123, 234, 345];
+    print_int(a[0]);
+}
