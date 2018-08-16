@@ -1,7 +1,7 @@
 # funlang
 
-Курсовая работа по дисциплине "Системное ПО"
-по теме "Разработка компилятора языка программирования"
+Toy programming language with syntax similar to Rust
+
 
 Dependencies:
   * CMake >= 3.4
